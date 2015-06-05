@@ -50,7 +50,6 @@ public class Main {
 		//Main loop
 		while(shiftNo++ < shiftCount){
 			try {
-			getJobs();
 			PriorityQueue<Schedule> pq = new PriorityQueue<Schedule>();
 			for(Schedule sched : mainSchedules)
 				pq.add(sched);					
@@ -309,17 +308,6 @@ public class Main {
 		
 	}
 
-	static void getJobs(){
-		
-		for(int i=11;i>=0;i--){ 
-			if(r.nextBoolean()){
-				Job job = new Job("J"+String.valueOf(i),procTimeArr[i]*Macros.TIME_SCALE_FACTOR,procCostArr[i],Job.JOB_NORMAL);
-				job.setPenaltyCost(20);
-				jobArray.add(job);
-			}
-		}
-	}
-	
 }
 class CompTTF implements Comparable<CompTTF>{
 	public long ttf;
