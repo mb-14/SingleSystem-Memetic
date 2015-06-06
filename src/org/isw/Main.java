@@ -4,6 +4,8 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -135,12 +137,13 @@ public class Main {
 				}
 			}
 			file.close();
-			
 		}
 		catch (Exception e)
 		{
 			e.printStackTrace();
-		}		
+		}	
+		//sort jobs in ascending order of job time
+		Collections.sort(jobArray,new JobComparator());
 	}
 
 	private static void writeResults(Machine machine) {
@@ -324,5 +327,21 @@ class CompTTF implements Comparable<CompTTF>{
 	public int compareTo(CompTTF other) {
 		return Long.compare(ttf, other.ttf);
 	}
-	
+}
+
+class JobComparator implements Comparator<Job> {
+	@Override
+	public int compare(Job a, Job b) 
+	{
+			return signOf(a.getJobTime() - b.getJobTime());
+	}
+	public int signOf(double a)
+	{
+		if(a>0)
+			return 1;
+		else if(a<0)
+			return -1;
+		else
+			return 0;
+	}
 }
