@@ -134,7 +134,8 @@ public class Main {
 				for(int j=0; j<demand ;j++){
 					Job job = new Job(jobName,jobTime,jobCost,Job.JOB_NORMAL);
 					job.setPenaltyCost(row.getCell(4).getNumericCellValue());
-				}
+					jobArray.add(job);			
+		}
 			}
 			file.close();
 		}
