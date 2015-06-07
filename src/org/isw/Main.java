@@ -143,7 +143,7 @@ public class Main {
 		{
 			e.printStackTrace();
 		}	
-		//sort jobs in ascending order of job time
+		//sort jobs in descending order of job time
 		Collections.sort(jobArray,new JobComparator());
 	}
 
@@ -334,7 +334,7 @@ class JobComparator implements Comparator<Job> {
 	@Override
 	public int compare(Job a, Job b) 
 	{
-			return signOf(a.getJobTime() - b.getJobTime());
+			return signOf(b.getJobTime() - a.getJobTime());
 	}
 	public int signOf(double a)
 	{
