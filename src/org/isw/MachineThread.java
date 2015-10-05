@@ -11,6 +11,7 @@ import java.util.concurrent.Executors;
 public class MachineThread implements Callable<ArrayList<SimulationResult>> {
 	Schedule schedule;
 	Machine machine;
+	ArrayList<Integer> pmoList;
 	
 	public MachineThread(Schedule schedule, int machineNo){
 		this.schedule = schedule;
@@ -19,27 +20,43 @@ public class MachineThread implements Callable<ArrayList<SimulationResult>> {
 	@Override
 	public ArrayList<SimulationResult> call() throws Exception {
 		System.out.println("Machine "+ (machine.machineNo+1)+ ": "+ schedule.printSchedule());
-		ArrayList<Integer> pmoList = schedule.getPMOpportunities();
+		pmoList = schedule.getPMOpportunities();
+		ExecutorService threadPool = Executors.newSingleThreadExecutor();
+		CompletionService<SimulationResult> pool = new ExecutorCompletionService<SimulationResult>(threadPool);
+		pool.submit(new SimulationThread(schedule,null,null,true,machine));
+		SimulationResult noPM = pool.take().get();
+		threadPool.shutdown();
+		while(!threadPool.isTerminated());
 		ArrayList<SimulationResult> results = new ArrayList<>();
 		if(pmoList.isEmpty()){
-		return results;
+			return results;
 		}
 
-		ExecutorService threadPool = Executors.newFixedThreadPool(20);
-		CompletionService<SimulationResult> pool = new ExecutorCompletionService<SimulationResult>(threadPool);
+		threadPool = Executors.newFixedThreadPool(20);
+		pool = new ExecutorCompletionService<SimulationResult>(threadPool);
 		int cnt=0;
-		for(Integer i : pmoList){
-			for(int j = 1;j<Math.pow(2,machine.compList.length);j++){
-				pool.submit(new SimulationThread(schedule,j,i,true,machine));
+		double max = Math.pow(2, machine.compList.length*pmoList.size());
+		for(int i = 1;i<max;i++){
+				pool.submit(new SimulationThread(schedule,getCombolist(i),pmoList,false,machine));
 				cnt++;
-			}
 		}
 		for(int i=0;i<cnt;i++)
-				results.add(pool.take().get());
-			
+		{
+			SimulationResult result = pool.take().get();
+			if(noPM.cost > result.cost)
+				results.add(result);
+		}	
 		threadPool.shutdown();
 		while(!threadPool.isTerminated());
 		return results;
+	}
+	
+	private long[] getCombolist(long combo) {
+		long combos[] = new long[pmoList.size()];
+		for(int i =0;i<pmoList.size();i++){
+			combos[i] = (combo>>(machine.compList.length*i))&((int)Math.pow(2,machine.compList.length)-1);
+		}
+		return combos;
 	}
 
 }

@@ -7,19 +7,41 @@ import java.io.InputStream;
 import java.util.Properties;
 
 
-
-/*
- * Scheduling listens on 8888
- * Machine listens on 8889
- */
-
 public class Macros {
+	public static final int START_MAINTENANCE_PLANNING = 19;
+	public static final int REQUEST_MAINTENANCE = 20;
+	public static final int MAINTENANCE_UNAVAILABLE = 21;
+	public static final int MAINTENANCE_AVAILABLE = 22;
+	public static final int LABOUR_GRANTED = 23;
+	public static final int LABOUR_DENIED = 24;
+	public static final int MACHINE_IDLE = 25;
+	public static final int MACHINE_RUNNING_JOB = 26;
+	public static final int MACHINE_WAITING_FOR_PM_LABOUR = 27;
+	public static final int MACHINE_WAITING_FOR_CM_LABOUR = 28;
+	public static final int MACHINE_PM = 29;
+	public static final int MACHINE_CM = 30;
+	public static final int MACHINE_PLANNING = 33;
+	public static final int START_SCHEDULING = 31;
+	public static final int INIT = 32;
+	public static final int REQUEST_NEXT_PERMUTATION = 34;
 
+
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
 	public static int TIME_SCALE_FACTOR = 1;
 	public static int SHIFT_DURATION = 8;
 	public static int SIMULATION_COUNT = 1000;
-	public static void loadMacros(){
-		
+	public static void loadMacros(){	
 		try {
 			Properties prop = new Properties();
 			InputStream input = new FileInputStream("config.properties");
@@ -35,7 +57,6 @@ public class Macros {
 			e.printStackTrace();
 		}
 	}
-	
 	
 	
 	

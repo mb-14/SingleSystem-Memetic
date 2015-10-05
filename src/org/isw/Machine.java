@@ -11,6 +11,7 @@ import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 
 public class Machine {
 
+	int machineStatus = Macros.MACHINE_IDLE;
 	int machineNo;
 	public  int shiftCount;
 	public  Component[] compList;
@@ -31,13 +32,10 @@ public class Machine {
 	public  long idleTime;
 
 	
-	public Machine(int machineNo){
-		System.out.println("Enter age of machine "+(machineNo+1)+" in hours:");
-		Scanner in = new Scanner(System.in);
-		int age = in.nextInt();
-		System.out.println("No of components:");
+	public Machine(int machineNo, Scanner in){
+		System.out.println("Enter no of components of machine "+(machineNo+1)+":");
 		int n = in.nextInt();
-		compList = parseExcel(age,n);
+		compList = parseExcel(n);
 		downTime = 0;
 		jobsDone = 0;
 		cmJobsDone = pmJobsDone = 0;
@@ -56,47 +54,68 @@ public class Machine {
 		this.machineNo = machineNo;
 	}
 	
-	private static Component[] parseExcel(int age, int n) {
+	private static Component[] parseExcel(int n) {
 		/**
 		 * Parse the component excel file into a list of components.
 		 * Total number of components should be 14 for our experiment.
 		 * Different component excel file for different machineNo (Stick
 		 * to one for now)
-		 * **/
+		 * 
+		 * */
 		Component[] c = new Component[n];
 		try
 		{
-			FileInputStream file = new FileInputStream(new File("Components.xlsx"));
+			FileInputStream file = new FileInputStream(new File("components.xlsx"));
 			XSSFWorkbook workbook = new XSSFWorkbook(file);
 			XSSFSheet sheet = workbook.getSheetAt(0);
-			
-			for(int i=4;i<4+n;i++)
+			XSSFSheet labourSheet = workbook.getSheetAt(1);
+			for(int i=5;i<5+n;i++)
 			{
 				Row row = sheet.getRow(i);
 				Component comp = new Component();
+
+				//--------CM data------------
+				//0 is assembly name
 				comp.compName = row.getCell(1).getStringCellValue();
-				comp.p1 = row.getCell(2).getNumericCellValue();
-				comp.p2 = row.getCell(3).getNumericCellValue();
-				comp.p3 = row.getCell(4).getNumericCellValue();
-				
-				comp.cmEta = row.getCell(5).getNumericCellValue();
-				comp.cmBeta = row.getCell(6).getNumericCellValue();
-				
-				comp.cmMu = row.getCell(7).getNumericCellValue();
-				comp.cmSigma = row.getCell(8).getNumericCellValue();
+				comp.initAge = row.getCell(2).getNumericCellValue();
+				comp.cmEta = row.getCell(3).getNumericCellValue();
+				comp.cmBeta = row.getCell(4).getNumericCellValue();
+				comp.cmMuRep = row.getCell(5).getNumericCellValue();
+				comp.cmSigmaRep = row.getCell(6).getNumericCellValue();
+				comp.cmMuSupp = row.getCell(7).getNumericCellValue();
+				comp.cmSigmaSupp = row.getCell(8).getNumericCellValue();
 				comp.cmRF = row.getCell(9).getNumericCellValue();
-				comp.cmCost = row.getCell(10).getNumericCellValue();
-				
-				comp.pmMu = row.getCell(11).getNumericCellValue();
-				comp.pmSigma = row.getCell(12).getNumericCellValue();
-				comp.pmRF = row.getCell(13).getNumericCellValue();
-				comp.pmCost = row.getCell(14).getNumericCellValue();
-				comp.pmFixedCost = row.getCell(15).getNumericCellValue();
-				comp.initAge = age;
-				c[i-4] = comp;
+				comp.cmCostSpare = row.getCell(10).getNumericCellValue();
+				comp.cmCostOther = row.getCell(11).getNumericCellValue();
+				//12 is empty
+				//13 is empty
+
+				//--------PM data------------
+				//14 is assembly name
+				//15 is component name
+				//16 is init age
+				comp.pmMuRep = row.getCell(17).getNumericCellValue();
+				comp.pmSigmaRep = row.getCell(18).getNumericCellValue();
+				comp.pmMuSupp = row.getCell(19).getNumericCellValue();
+				comp.pmSigmaSupp = row.getCell(20).getNumericCellValue();
+				comp.pmRF = row.getCell(21).getNumericCellValue();
+				comp.pmCostSpare = row.getCell(22).getNumericCellValue();
+				comp.pmCostOther = row.getCell(23).getNumericCellValue();
+				row = labourSheet.getRow(i);
+				comp.labourCost = new double[]{800,500,300};
+				comp.pmLabour = new int[3];
+				comp.pmLabour[0] = (int)row.getCell(3).getNumericCellValue();
+				comp.pmLabour[1] = (int)row.getCell(5).getNumericCellValue();
+				comp.pmLabour[2] = (int)row.getCell(7).getNumericCellValue();
+				comp.cmLabour = new int[3];
+				comp.cmLabour[0] = (int)row.getCell(2).getNumericCellValue();
+				comp.cmLabour[1] = (int)row.getCell(4).getNumericCellValue();
+				comp.cmLabour[2] = (int)row.getCell(6).getNumericCellValue();
+				comp.initProps(i-5);
+				c[i-5] = comp;
 			}
 			file.close();
-			
+
 		}
 		catch (Exception e)
 		{
@@ -105,5 +124,15 @@ public class Machine {
 		return c;
 	}
 
+	public void setStatus(int status)
+	{
+		machineStatus = status;
+	}
+	
+	public int getStatus()
+	{
+		return machineStatus;
+	}
+	
 
 }

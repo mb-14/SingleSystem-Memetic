@@ -2,40 +2,37 @@ package org.isw;
 
 import java.io.File;
 import java.io.FileInputStream;
-import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
 import java.util.PriorityQueue;
 import java.util.Random;
 import java.util.Scanner;
 import java.util.concurrent.CompletionService;
+import java.util.concurrent.CyclicBarrier;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorCompletionService;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 import org.apache.poi.ss.usermodel.Row;
 import org.apache.poi.xssf.usermodel.XSSFSheet;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 
 public class Main {
-	public static ArrayList<Component[]> compList = new ArrayList<Component[]>();
 	public static ArrayList<Schedule> mainSchedules = new ArrayList<Schedule>();
+	public static ArrayList<Schedule> minSchedules = new ArrayList<Schedule>();
+	static ArrayList<ArrayList<SimulationResult>> table;
 	static Random r = new Random(); 
 	static ArrayList<Job> jobArray;
-	final static long procTimeArr[]={5,5,5,4,4,4,4,4,2,2,1,1};
-	final static int procCostArr[]={80,80,70,70,70,60,60,50,50,40,40,40};
-	static Map<Long, List<SimulationResult>> result_map;
 	static ArrayList<Machine> machines = new ArrayList<Machine>();
 	static int noOfMachines =0;
-	private static double minCost;
-	private static PriorityQueue<CompTTF> ttfList;
-	private static long timemax = 0;
-	public static void main(String args[])
+	static LabourAvailability pmLabourAssignment;
+	public static AtomicBoolean labour;
+	static Double minCost;
+	static double runTime;
+	public static void main(String args[]) throws InterruptedException, ExecutionException
 	{
 		Macros.loadMacros();
 		parseJobs();
@@ -45,13 +42,14 @@ public class Main {
 		System.out.println("Enter number of machines:");
 		noOfMachines = in.nextInt();
 		for(int i=0;i<noOfMachines;i++){
-			machines.add(new Machine(i));
+			machines.add(new Machine(i ,in));
 			mainSchedules.add(new Schedule());
+			minSchedules.add(mainSchedules.get(i));
 		}
+		minCost = Double.MAX_VALUE;
 		int shiftNo = 0;
 		//Main loop
 		while(shiftNo++ < shiftCount){
-			try {
 			PriorityQueue<Schedule> pq = new PriorityQueue<Schedule>();
 			for(Schedule sched : mainSchedules)
 				pq.add(sched);					
@@ -67,64 +65,202 @@ public class Main {
 			ExecutorService threadPool = Executors.newFixedThreadPool(noOfMachines);
 			CompletionService<ArrayList<SimulationResult>> pool = new ExecutorCompletionService<ArrayList<SimulationResult>>(threadPool);
 			int cnt=0;
-			minCost = Double.MAX_VALUE;
-			ttfList = new PriorityQueue<CompTTF>();
+			
+			table = new ArrayList<ArrayList<SimulationResult>>();	
+			System.out.println("Planning...");
+			long startTime = System.nanoTime();
 			while(!pq.isEmpty()){
 				cnt++;
 				Schedule sched = pq.poll();
 				pool.submit(new MachineThread(sched,mainSchedules.indexOf(sched)));
 			}
+			for(int i=0;i<cnt;i++){
+				ArrayList<SimulationResult> results  = pool.take().get();	
+				for(int j=0;j<results.size();j++)
+				{
+						for(int pmOpp=0; pmOpp < results.get(j).pmOpportunity.size(); pmOpp++)
+						{
+							// calculate start times for each job in SimulationResult
+							if(results.get(j).pmOpportunity.get(pmOpp) <= 0){
+								results.get(j).startTimes[pmOpp] = 0; //assign calculated t
+							}
+							else{
+								// start time of PM job is finishing time of job before it
+								results.get(j).startTimes[pmOpp] = mainSchedules.get(i).getFinishingTime(results.get(j).pmOpportunity.get(pmOpp)-1);
+							}
+						}
+					
+				}
+				System.out.println(results.size());
+				table.add(results);
 			
-			for(int i=0; i<noOfMachines;i++){
-				for(int j=0;j<machines.get(i).compList.length;j++){
-					long ttf = (long)(machines.get(i).compList[j].getCMTTF()*Macros.TIME_SCALE_FACTOR);				
-					long ttr = (long)(machines.get(i).compList[j].getCMTTR()*Macros.TIME_SCALE_FACTOR);
-				ttfList.add(new CompTTF(ttf,(ttr==0)?1:ttr,i,j));	
+			}
+
+			threadPool.shutdown();
+			while(!threadPool.isTerminated());
+			pmLabourAssignment = new LabourAvailability(new int[]{1,0,0}, Macros.SHIFT_DURATION*Macros.TIME_SCALE_FACTOR);
+			for(int i=0; i<mainSchedules.size(); i++)
+			{
+				Schedule sched = mainSchedules.get(i);
+				if(!sched.isEmpty() && sched.jobAt(0).getJobType()==Job.JOB_PM)
+				{
+					//pending PM job present in this schedule
+					System.out.println("Reserving Labour for previous shift PM job");
+					//reserve labour for it
+					pmLabourAssignment.employLabour(0, sched.jobAt(0).getSeriesTTR(), sched.jobAt(0).getSeriesLabour());
+				}
+			}
+			System.out.println("Calculating permutations");
+			
+			for(int i=0;i<table.get(0).size();i++)
+				calculatePermutations(table.get(0).get(i),pmLabourAssignment); 
+			
+			runTime = (System.nanoTime() - startTime)/Math.pow(10, 9);
+			mainSchedules = minSchedules;
+			
+			calculateCost(false);
+		}	
+		System.out.format("Planning time: %f\n",runTime);
+		for(Machine machine : machines)
+			writeResults(machine);
+	}
+	private static void calculatePermutations(SimulationResult row, LabourAvailability pmLabourAssignment) throws InterruptedException, ExecutionException {
+		Schedule temp = new Schedule(mainSchedules.get(row.id));
+		LabourAvailability tempLabour = new LabourAvailability(pmLabourAssignment);
+		assignLabour(row,pmLabourAssignment);
+		if(row.id == noOfMachines - 1){
+			calculateCost(true);
+		}
+		else {
+			for(int j=0;j<table.get(row.id+1).size(); j++){
+				calculatePermutations(table.get(row.id+1).get(j),pmLabourAssignment);
+			}
+		}
+		pmLabourAssignment = tempLabour;
+		mainSchedules.set(row.id, temp);
+	}
+
+	private static void calculateCost(boolean isPlanning) throws InterruptedException, ExecutionException {
+		ExecutorService threadPool = Executors.newFixedThreadPool(noOfMachines);
+		CompletionService<Double> pool = new ExecutorCompletionService<Double>(threadPool);
+		CyclicBarrier sync = new CyclicBarrier(noOfMachines);
+		labour = new AtomicBoolean(true);
+		for(int i=0;i<noOfMachines;i++){
+			pool.submit(new JobExecThread(mainSchedules.get(i),machines.get(i),isPlanning,sync));
+		}
+		Double cost = 0d;
+		for(int i=0;i<noOfMachines;i++){
+			cost += pool.take().get();
+		}
+		if(isPlanning){
+			if(cost < minCost){
+				minCost = cost;
+				for(int j=0;j<noOfMachines;j++)
+					minSchedules.set(j,new Schedule(mainSchedules.get(j)));
+			}
+		}
+	}
+	
+	static void assignLabour(SimulationResult row, LabourAvailability pmLabour){
+		Component[] compList = machines.get(row.id).compList;
+		row.pmTTRs = new long[row.pmOpportunity.size()][compList.length];
+		// check if schedule is empty
+		if(!mainSchedules.get(row.id).isEmpty())
+		{
+			// generate PM TTRs of all components undergoing PM for this row
+			boolean meetsReqForAllOpp = true;
+			int[][] seriesLabour = new int[row.pmOpportunity.size()][3];
+			long[] seriesTTR = new long[row.pmOpportunity.size()];
+			for(int pmOpp = 0; pmOpp<row.pmOpportunity.size(); pmOpp++)
+			{					
+				seriesLabour[pmOpp][0] = 0;
+				seriesLabour[pmOpp][1] = 0;
+				seriesLabour[pmOpp][2] = 0;
+				seriesTTR[pmOpp] = 0;
+				for(int compno=0;compno<compList.length;compno++)
+				{
+					int pos = 1<<compno;
+					if((pos&row.compCombo[pmOpp])!=0) //for each component in combo, generate TTR
+					{
+						row.pmTTRs[pmOpp][compno] = Component.notZero(compList[compno].getPMTTR()*Macros.TIME_SCALE_FACTOR); //store PM TTR
+						seriesTTR[pmOpp] += row.pmTTRs[pmOpp][compno];
+						
+						// find max labour requirement for PM series
+						int[] labour1 = compList[compno].getPMLabour();
+						
+						if(seriesLabour[pmOpp][0] < labour1[0])
+							seriesLabour[pmOpp][0] = labour1[0];
+						if(seriesLabour[pmOpp][1] < labour1[1])
+							seriesLabour[pmOpp][1] = labour1[1];
+						if(seriesLabour[pmOpp][2] < labour1[2])
+							seriesLabour[pmOpp][2] = labour1[2];
+					}
+				}
+				if(!pmLabour.checkAvailability(row.startTimes[pmOpp], row.startTimes[pmOpp]+seriesTTR[pmOpp], seriesLabour[pmOpp]))
+				{
+					// add series of PM jobs at that opportunity.
+					meetsReqForAllOpp = false;
+					break;
 				}
 			}
 			
-			result_map = new HashMap<Long, List<SimulationResult>>();
-			for(int i=0;i<cnt;i++){
-				ArrayList<SimulationResult> results = pool.take().get();
-				for(SimulationResult result : results){
-					List<SimulationResult> l = result_map.get(result.t);
-					if(l == null){
-						if(result.t > timemax )
-							timemax = result.t;
-						  result_map.put(result.t, l=new ArrayList<SimulationResult>());
-				    	}
-					l.add(result);
-					}
-				}			
-			threadPool.shutdown();
-			while(!threadPool.isTerminated());
-			threadPool = Executors.newFixedThreadPool(noOfMachines);
-			calcCombos(0,mainSchedules,0);
-			for(int i=0;i<noOfMachines;i++){
-				threadPool.execute(new JobExecThread(mainSchedules.get(i),machines.get(i)));
-				}
-			threadPool.shutdown();
-			while(!threadPool.isTerminated());
-			} 
-			catch (InterruptedException | ExecutionException | IOException e) {
-			
-				e.printStackTrace();
-			} 
+			if(meetsReqForAllOpp)
+			{
+				//incorporate the PM job(s) into schedule of machine
+				addPMJobs(mainSchedules.get(row.id), machines.get(row.id).compList, row, seriesTTR, seriesLabour);
+				//reserve labour
+				for(int pmOpp = 0; pmOpp<row.pmOpportunity.size(); pmOpp++)
+					pmLabour.employLabour(row.startTimes[pmOpp], row.startTimes[pmOpp]+seriesTTR[pmOpp], seriesLabour[pmOpp]);
+			}
 		}
-		for(Machine machine : machines)
-			writeResults(machine);
-		
 	}
+	private static void addPMJobs(Schedule schedule,Component[] compList, SimulationResult row, long[] seriesTTR, int[][] seriesLabour) {
+		/*
+		 * Add PM jobs to given schedule.
+		 */
+		int cnt = 0;
+		ArrayList<Integer> pmOpportunity = row.pmOpportunity;
+		long[] compCombo = row.compCombo;
+		
+		for(int pmOpp = 0; pmOpp<pmOpportunity.size(); pmOpp++)
+		{
+			for(int i=0;i< compList.length;i++)
+			{
+				int pos = 1<<i;
+				if((pos&compCombo[pmOpp])!=0) //for each component in combo, add a PM job
+				{
+					long pmttr = Component.notZero(row.pmTTRs[pmOpp][i]);
+					
+					Job pmJob = new Job("PM",pmttr,compList[i].getPMLabourCost(),Job.JOB_PM);
+					pmJob.setCompNo(i);
+					pmJob.setSeriesTTR(seriesTTR[pmOpp]);
+					pmJob.setSeriesLabour(seriesLabour[pmOpp]);
+					if(cnt==0){
+						// consider fixed cost only once, for the first job
+						pmJob.setFixedCost(compList[i].getPMFixedCost());
+					}
+					
+					// add job to schedule
+					schedule.addPMJob(new Job(pmJob),pmOpportunity.get(pmOpp)+cnt);
 
-	private static void parseJobs() {
+					cnt++;
+				}
+			}
+		}
+	}
+	private static void parseJobs() 
+	{
+		/*
+		 * Get jobs from Excel sheet
+		 */
 		jobArray = new ArrayList<Job>();
 		try
 		{
 			FileInputStream file = new FileInputStream(new File("Jobs.xlsx"));
 			XSSFWorkbook workbook = new XSSFWorkbook(file);
 			XSSFSheet sheet = workbook.getSheetAt(0);
-			
-			for(int i=1;i<=12;i++)
+
+			for(int i=1;i<=9;i++)
 			{
 				Row row = sheet.getRow(i);
 				int demand = (int) row.getCell(5).getNumericCellValue();
@@ -134,8 +270,8 @@ public class Main {
 				for(int j=0; j<demand ;j++){
 					Job job = new Job(jobName,jobTime,jobCost,Job.JOB_NORMAL);
 					job.setPenaltyCost(row.getCell(4).getNumericCellValue());
-					jobArray.add(job);			
-		}
+					jobArray.add(job);
+				}
 			}
 			file.close();
 		}
@@ -144,14 +280,17 @@ public class Main {
 			e.printStackTrace();
 		}	
 		//sort jobs in descending order of job time
-		Collections.sort(jobArray,new JobComparator());
+
+		Collections.sort(jobArray, new JobComparator());
+
 	}
+
 
 	private static void writeResults(Machine machine) {
 
 		System.out.println("=========================================");
 		System.out.println("Machine "+ (machine.machineNo+1));
-		System.out.println("Downtime:" + String.valueOf(machine.downTime*100/(machine.runTime)) +"%");
+		//System.out.println("Downtime:" + String.valueOf(machine.downTime*100/(machine.runTime)) +"%");
 		System.out.println("CM Downtime: "+ machine.cmDownTime +" hours");
 		System.out.println("PM Downtime: "+ machine.pmDownTime +" hours");
 		System.out.println("Waiting Downtime: "+ machine.waitTime +" hours");
@@ -168,181 +307,13 @@ public class Main {
 		
 	}
 	
-	public static void calcCombos(long time,ArrayList<Schedule> sched, int bitmask) throws IOException, InterruptedException, ExecutionException{
-		if(bitmask == ((1<<noOfMachines)-1)|| time> timemax){
-			calcCost(sched);
-			return;
-		}
-		List<SimulationResult> l = result_map.get(time);
-		if(l==null){
-			calcCombos(time+1,sched,bitmask);
-		}
-		else{
-			int cnt=0;
-			for(SimulationResult result : l){
-				if((bitmask & 1<<result.id) == 0){
-					cnt++;
-					ArrayList<Schedule> temp = new ArrayList<Schedule>(sched);
-					for(int i=0; i< temp.size();i++){
-						Schedule schedule = temp.get(i);
-						temp.set(i,new Schedule(schedule));
-					}
-					Job pmJob = new Job("PM",result.pmAvgTime,5000,Job.JOB_PM);
-					pmJob.setCompCombo(result.compCombo);
-					temp.get(result.id).addPMJob(pmJob, result.pmOpportunity);
-					calcCombos(time + result.pmAvgTime,temp,bitmask|(1<<result.id));
-				}
-			}
-			if(cnt==0)
-				calcCombos(time+1,sched,bitmask);
-			}
-		
-	}
-
-	private static void calcCost(ArrayList<Schedule> temp) throws InterruptedException, ExecutionException {
-		addCMJobs(temp);
-		double cost =0;
-		ExecutorService threadPool = Executors.newFixedThreadPool(noOfMachines);
-		CompletionService<SimulationResult> pool = new ExecutorCompletionService<SimulationResult>(threadPool);
-		for(Schedule schedule : temp){
-			pool.submit(new SimulationThread(schedule,-1,-1,false,null));
-		}
-		for(int i = 0;i<temp.size();i++){
-			cost += pool.take().get().cost;
-		}
-		if(cost < minCost){
-			mainSchedules = temp;
-			minCost = cost;
-		}
-		threadPool.shutdown();
-		while(!threadPool.isTerminated());
-		
-	}
-	private static void addCMJobs(ArrayList<Schedule> temp) {
-		while(!ttfList.isEmpty()){
-			CompTTF compTTF = ttfList.remove();
-			if(compTTF.ttf>= Macros.SHIFT_DURATION*Macros.TIME_SCALE_FACTOR || compTTF.ttf >= temp.get(compTTF.machineID).getSum())
-				continue;
-			if(temp.get(compTTF.machineID).isEmpty())
-				continue;
-			//if PM is performed for a component before ttf of that component, ignore.
-			ArrayList<Job> pmJobs =	temp.get(compTTF.machineID).getPMJobs();
-			boolean flag = false;
-			for(Job pmJob : pmJobs){
-			int tempIndex = temp.get(compTTF.machineID).indexOf(pmJob);
-			int compCombo = pmJob.getCompCombo();
-			long time =	temp.get(compTTF.machineID).getFinishingTime(tempIndex-1);
-			if(compTTF.ttf>= time && ((1<<compTTF.componentID)&compCombo)!=0)
-				flag = true;
-			}
-			if(flag)
-				continue;
-			int index = temp.get(compTTF.machineID).jobIndexAt(compTTF.ttf);
-			Job job = temp.get(compTTF.machineID).jobAt(index);
-			/**If breakdown occurs on a machine while PM/CM is going on shift the ttf to occur after
-			 * the PM/CM ends
-			 * **/ 
-			if(job.getJobType() == Job.JOB_PM || job.getJobType() == Job.JOB_CM || job.getJobType() ==  Job.WAIT_FOR_MT)
-			{
-				//TODO: Calculate new time
-				long newTime = temp.get(compTTF.machineID).getFinishingTime(index);
-				if(newTime >= temp.get(compTTF.machineID).getSum() || newTime >= Macros.SHIFT_DURATION*Macros.TIME_SCALE_FACTOR)
-					continue;
-				ttfList.add(new CompTTF(newTime,compTTF.ttr,compTTF.machineID,compTTF.componentID));
-				continue;
-			}
-			
-			boolean pmFlag = false;
-			boolean cmFlag = false;
-			int cmIndex = 0;
-			int cmJobIndex = 0;
-			int pmIndex =0;
-			int pmJobIndex =0;
-			//Loop through all machines and check for overlaps.
-			for(int i = 0;i < temp.size();i++){
-				if(compTTF.machineID == i || temp.get(i).getSum() <= compTTF.ttf || temp.get(i).isEmpty())
-					continue;
-				int index1 = temp.get(i).jobIndexAt(compTTF.ttf); 
-				Job job1 = temp.get(i).jobAt(index1);
-				switch(job1.getJobType()){
-					case Job.JOB_CM:
-						cmFlag = true;
-						cmIndex = i;
-						cmJobIndex = index1;
-						break;
-					case Job.JOB_PM:
-						pmFlag = true;
-						pmIndex = i;
-						pmJobIndex = index1;
-						break;
-				}		
-			
-				if(cmFlag){
-					/**If CM is being performed on a different machine wait for CM to complete i.e 
-					 * shift breakdown time to occur after CM job.
-					 * **/
-					long newTime = temp.get(cmIndex).getFinishingTime(cmJobIndex);
-					if(newTime>=Macros.SHIFT_DURATION*Macros.TIME_SCALE_FACTOR||newTime>=	temp.get(compTTF.machineID).getSum())
-						continue;
-					int jobIndex =	temp.get(compTTF.machineID).jobIndexAt(compTTF.ttf);
-					temp.get(compTTF.machineID).addWaitJob(compTTF.ttf, newTime-compTTF.ttf, jobIndex);
-					ttfList.add(new CompTTF(newTime,compTTF.ttr,compTTF.machineID,compTTF.componentID));
-				}
-				else if(pmFlag){
-					/**If PM is being performed on a different machine, interrupt that PM and add a waiting job
-					 * and then add the CM job for our machine.
-					 **/
-					temp.get(pmIndex).addWaitJob(compTTF.ttf, compTTF.ttr,pmJobIndex);
-					Job cmJob = new Job("CM",compTTF.ttr,machines.get(compTTF.machineID).compList[compTTF.componentID].getCMCost(),Job.JOB_CM);
-					cmJob.setFixedCost(machines.get(compTTF.machineID).compList[compTTF.componentID].getCompCost());
-					cmJob.setCompNo(compTTF.componentID);
-					temp.get(compTTF.machineID).addCMJob(cmJob, compTTF.ttf);
-				}
-				else{
-					//Since no maintenance is going on add CM job directly
-					Job cmJob = new Job("CM",compTTF.ttr,machines.get(compTTF.machineID).compList[compTTF.componentID].getCMCost(),Job.JOB_CM);
-					cmJob.setFixedCost(machines.get(compTTF.machineID).compList[compTTF.componentID].getCompCost());
-					cmJob.setCompNo(compTTF.componentID);
-					temp.get(compTTF.machineID).addCMJob(cmJob, compTTF.ttf);
-				}
-			}
-			
-		
-		}
-		
-	}
-
 }
-class CompTTF implements Comparable<CompTTF>{
-	public long ttf;
-	public int machineID;
-	public long ttr;
-	public int componentID;
-	public CompTTF(long ttf2,long ttr2,int count,int compID) {
-		ttf = ttf2;
-		machineID = count;
-		ttr = ttr2;
-		componentID = compID;
-	}
-	@Override
-	public int compareTo(CompTTF other) {
-		return Long.compare(ttf, other.ttf);
-	}
-}
-
 class JobComparator implements Comparator<Job> {
 	@Override
 	public int compare(Job a, Job b) 
 	{
-			return signOf(b.getJobTime() - a.getJobTime());
-	}
-	public int signOf(double a)
-	{
-		if(a>0)
-			return 1;
-		else if(a<0)
-			return -1;
-		else
-			return 0;
-	}
+
+			return Long.compare(b.getJobTime(),a.getJobTime()); 
+	}	
+
 }

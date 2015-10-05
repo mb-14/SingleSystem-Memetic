@@ -2,9 +2,9 @@ package org.isw;
 
 import java.io.IOException;
 import java.io.ObjectInputStream;
+import java.io.ObjectOutputStream;
 import java.io.Serializable;
 import java.net.InetAddress;
-import java.net.ServerSocket;
 import java.net.Socket;
 import java.util.ArrayList;
 
@@ -15,10 +15,11 @@ public class Schedule implements  Comparable<Schedule>,Serializable{
 	private ArrayList<Job> jobs;
 	private long sum;
 	InetAddress ip;
-
+	boolean planning;
 	public Schedule(){
 		sum = 0;
 		jobs = new ArrayList<Job>();
+		planning = false;
 	}
 	
 	public Schedule(Schedule source){
@@ -26,11 +27,13 @@ public class Schedule implements  Comparable<Schedule>,Serializable{
 		jobs =  new ArrayList<Job>();
 		for(int i =0; i<source.jobs.size();i++){
 			jobs.add(new Job(source.jobAt(i)));
-		}		
+		}
+		planning = source.planning;
 	}
 	
 	public Schedule(InetAddress byName) {
 		//check this
+		planning = false;
 		sum = 0;
 		jobs = new ArrayList<Job>();
 	}
@@ -38,6 +41,13 @@ public class Schedule implements  Comparable<Schedule>,Serializable{
 	public void addJob(Job job){
 		jobs.add(job);
 		sum+=job.getJobTime();
+		//System.out.println("Added Job, new sum: "+sum);
+	}
+	
+	public void addJobTop(Job job){
+		jobs.add(0, job);
+		sum+=job.getJobTime();
+		//System.out.println("Added Job, new sum: "+sum);
 	}
 	
 	public int numOfJobs()
@@ -75,20 +85,31 @@ public class Schedule implements  Comparable<Schedule>,Serializable{
 				jobs.add(i,cmJob);
 			}
 		sum += cmJob.getJobTime();
+		//System.out.println("Added CM Job, new sum: "+sum);
 	}
 	//Insert PM job at give opportunity.
 	public void addPMJob(Job pmJob, int opportunity){
 		jobs.add(opportunity, pmJob);
 		sum += pmJob.getJobTime();
+		//System.out.println("Added PM Job, new sum: "+sum);
 	}
 	
 	public synchronized Job remove() throws IOException{
 		Job job = jobs.remove(0);
 		sum -= job.getJobTime();
 		if(sum < 0){
+			System.out.println("Sum: "+sum);
 			throw new IOException();
 		}
 		return job;
+	}
+	
+	public void remove(int i) throws IOException{
+		Job job = jobs.remove(i);
+		sum -= job.getJobTime();
+		if(sum < 0){
+			throw new IOException();
+		}
 	}
 	
 	@Override
@@ -105,6 +126,9 @@ public class Schedule implements  Comparable<Schedule>,Serializable{
 	}
 	
 	public synchronized void decrement(long delta) throws IOException{
+		/*
+		 * Decrements the first job and the total time sum by delta
+		 */
 		jobs.get(0).decrement(delta);
 		sum -= delta;
 		if(sum < 0){
@@ -147,11 +171,10 @@ public class Schedule implements  Comparable<Schedule>,Serializable{
 		}
 		return i-1;
 	}
-
+/*
 	public void addWaitJob(long startTime, long waitTime, int jobIndex) {
 		Job job = jobs.remove(jobIndex);
 		long time = getFinishingTime(jobIndex-1);
-		System.out.println(startTime +":"+time);
 		Job job1 = new Job(job.getJobName(),startTime - time,job.getJobCost(),job.getJobType());
 		job1.setFixedCost(job.getFixedCost());
 		Job waitJob = new Job("Waiting",waitTime,0,Job.WAIT_FOR_MT);
@@ -168,6 +191,7 @@ public class Schedule implements  Comparable<Schedule>,Serializable{
 		}
 		sum += waitTime;
 	}
+	*/
 
 	public long getFinishingTime(int index){
 		long sum = 0;
@@ -185,14 +209,14 @@ public class Schedule implements  Comparable<Schedule>,Serializable{
 	public int indexOf(Job job){
 		return jobs.indexOf(job);
 	}
-	public static Schedule receive(ServerSocket tcpSocket)
+	public static Schedule receive(Socket socket)
 	{
 		//uses TCP to receive Schedule
 		Schedule ret = null;
 		try
 		{
-			Socket tcpSchedSock = tcpSocket.accept();
-			ObjectInputStream ois = new ObjectInputStream(tcpSchedSock.getInputStream());
+			socket.setSoTimeout(0);
+			ObjectInputStream ois = new ObjectInputStream(socket.getInputStream());
 			Object o = ois.readObject();
 
 			if(o instanceof Schedule) 
@@ -204,10 +228,9 @@ public class Schedule implements  Comparable<Schedule>,Serializable{
 			{
 				System.out.println("Received Schedule is garbled");
 			}
-			ois.close();
-			tcpSchedSock.close();
 		}catch(Exception e)
 		{
+			e.printStackTrace();
 			System.out.println("Failed to receive schedule.");
 		}
 
@@ -222,7 +245,7 @@ public class Schedule implements  Comparable<Schedule>,Serializable{
 		if(jobs.isEmpty())
 			return arr;
 		
-		if(jobs.get(0).getJobType() == Job.JOB_NORMAL)
+		if(jobs.get(0).getJobType() == Job.JOB_NORMAL && jobs.get(0).getStatus() == Job.NOT_STARTED)
 			arr.add(0);
 		int i=1;
 		while(i<jobs.size()){
@@ -235,17 +258,7 @@ public class Schedule implements  Comparable<Schedule>,Serializable{
 			arr.add(i);
 		return arr;
 	}
-
-	public Job remove(int index) throws IOException {
-		Job job = jobs.remove(index);
-		sum -= job.getJobTime();
-		if(sum < 0){
-			throw new IOException();
-		}
-		return job;
-		
-	}
-
+	
 	public ArrayList<Job> getPMJobs() {
 		ArrayList<Job> pmJobs = new ArrayList<Job>();
 		for(int i = jobs.size()-1; i>0; i--){
@@ -253,5 +266,37 @@ public class Schedule implements  Comparable<Schedule>,Serializable{
 					pmJobs.add(jobs.get(i));
 		}
 		return pmJobs;
+	}
+
+	public ArrayList<Job> getCMJobs() {
+		ArrayList<Job> cmJobs = new ArrayList<Job>();
+		for(int i = jobs.size()-1; i>0; i--){
+				if(jobs.get(i).jobType == Job.JOB_CM)
+					cmJobs.add(jobs.get(i));
+		}
+		return cmJobs;
+	}
+
+	public void send(Socket socket) throws IOException{
+		ObjectOutputStream oos = new ObjectOutputStream(socket.getOutputStream());
+		oos.writeObject(this);
+	}
+
+	public void setPlanning(boolean b) {
+		planning = b;
+		
+	}
+
+	public boolean isPlanning() {
+		// TODO Auto-generated method stub
+		return planning;
+	}
+
+	public void send(InetAddress ip, int port) throws IOException {
+		Socket socket = new Socket(ip,port);
+		ObjectOutputStream oos = new ObjectOutputStream(socket.getOutputStream());
+		oos.writeObject(this);
+		oos.close();
+		socket.close();
 	}
 }

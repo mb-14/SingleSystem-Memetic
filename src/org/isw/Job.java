@@ -9,22 +9,32 @@ public class Job implements Serializable {
 	public static final int JOB_NORMAL = 1;
 	public static final int JOB_PM = 2;
 	public static final int JOB_CM = 3;
-	public static final int WAIT_FOR_MT = 4;
+	
+	// job status
+	public static final int NOT_STARTED=1;
+	public static final int STARTED = 2;
+	public static final int SERIES_STARTED = 3;
+	
 	private static final long serialVersionUID = 1L;
 	long jobTime;
 	String jobName;
 	int jobType;
-	int compNo;
-	int compCombo;
-	//Fixed cost can be the component cost or the PM fixed cost. 
-	double fixedCost;
-	double jobCost;
+	int compNo; // in case of CM
+	int jobStatus;
+	
+	double fixedCost; //fixed cost for CM or PM
+	
+	long seriesTTR;
+	int[] seriesLabour;
+	
+	double jobCost; // cost per hour for CM or PM, or job processing cost
 	double penaltyCost;
 	public Job(String jobName, long jobTime,double  jobCost, int jobType) {
 		this.jobTime = jobTime;
 		this.jobName = jobName;
 		this.jobType = jobType;
 		this.jobCost = jobCost;
+		this.jobStatus = NOT_STARTED;
 		fixedCost = 0;
 		penaltyCost = 0;
 	}
@@ -34,10 +44,13 @@ public class Job implements Serializable {
 		this.jobName = source.jobName;
 		this.jobType = source.jobType;
 		this.jobCost = source.jobCost;
-		this.compCombo = source.compCombo;
-		this.compNo = source.compNo;
+		this.jobStatus = source.jobStatus;
+		compNo = source.compNo;
 		fixedCost = source.fixedCost;
 		penaltyCost = source.penaltyCost;
+		seriesTTR = source.seriesTTR;
+		seriesLabour = source.seriesLabour;
+	
 	}
 
 	public void setPenaltyCost(double penaltyCost){
@@ -52,8 +65,6 @@ public class Job implements Serializable {
 	
 	public void decrement(long delta) {
 		jobTime -=delta;
-		if(jobTime<0)
-			jobTime=0;
 	}
 	
 	public String getJobName() {
@@ -62,6 +73,15 @@ public class Job implements Serializable {
 	
 	public int getJobType(){
 		return jobType;
+	}
+	
+	public void setStatus(int status){
+		this.jobStatus = status;
+	}
+	
+	public int getStatus()
+	{
+		return this.jobStatus;
 	}
 	
 	/**
@@ -85,12 +105,22 @@ public class Job implements Serializable {
 		compNo = no;
 		
 	}
-	public int getCompCombo() {
-		return compCombo;
+	
+	public long getSeriesTTR() {
+		return seriesTTR;
 	}
 
-	public void setCompCombo(int compCombo) {
-		this.compCombo = compCombo;
+	public void setSeriesTTR(long seriesTTR) {
+		this.seriesTTR = seriesTTR;
+	}
+
+	public int[] getSeriesLabour() {
+		return seriesLabour;
+	}
+
+	public void setSeriesLabour(int[] seriesLabour) {
+		this.seriesLabour = seriesLabour;
 	}
 	
+		
 }
