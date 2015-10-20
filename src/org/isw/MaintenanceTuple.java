@@ -23,7 +23,10 @@ public class MaintenanceTuple implements Serializable
 	{
 		start = mt.start;
 		end = mt.end;
-		labour = mt.labour.clone();
+		labour = new int[3];
+		labour[0] = mt.labour[0];
+		labour[1] = mt.labour[1];
+		labour[2] = mt.labour[2];
 	}
 	
 	public MaintenanceTuple(int start)

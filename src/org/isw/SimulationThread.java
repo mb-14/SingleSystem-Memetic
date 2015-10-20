@@ -12,7 +12,7 @@ public class SimulationThread implements Callable<SimulationResult> {
 	long compCombo[]; //Combination of components to perform PM on.
 	ArrayList<Integer> pmOpportunity;
 	Component[] simCompList;
-	int noOfSimulations = Macros.SIMULATION_COUNT;
+	int noOfSimulations = 1000;
 	boolean noPM;
 	Machine machine;
 	public SimulationThread(Schedule schedule, long compCombo[], ArrayList<Integer> pmOpportunity,boolean noPM, Machine machine){
@@ -27,10 +27,13 @@ public class SimulationThread implements Callable<SimulationResult> {
 	 * For each simulation PM is done only once and is carried out in between job executions.
 	 * @throws IOException 
 	 * **/
-	public SimulationResult call() throws IOException{
+	public SimulationResult call(){
 		double totalCost = 0;
 		double pmAvgTime = 0;
 		int cnt = 0;
+		int cmJobs = 0;
+		int pmJobs = 0;
+		double runTime = 0;
 		while(cnt++ < noOfSimulations){
 			double pmCost = 0;   //PM cost 
 			double cmCost = 0;   //CM cost
@@ -43,7 +46,6 @@ public class SimulationThread implements Callable<SimulationResult> {
 			if(!noPM){
 				addPMJobs(simSchedule,simCompList);
 			}
-
 			// find all machine failures and CM times for this shift
 			LinkedList<FailureEvent> failureEvents = new LinkedList<FailureEvent>();
 			FailureEvent upcomingFailure = null;
@@ -67,6 +69,7 @@ public class SimulationThread implements Callable<SimulationResult> {
 			while(time < Macros.SHIFT_DURATION*Macros.TIME_SCALE_FACTOR && !simSchedule.isEmpty()){
 				//Calculate the cost depending upon the job type
 				Job current = simSchedule.peek(); 
+				//debug2 += String.format("%s: %d\n", current.getJobName(),current.getJobTime()); 
 				//System.out.println(current.getJobName()+":"+time);
 				if(current.getJobType()!= Job.JOB_CM&&current.getJobType()!= Job.JOB_PM && upcomingFailure!=null && time == upcomingFailure.failureTime)
 				{
@@ -74,12 +77,13 @@ public class SimulationThread implements Callable<SimulationResult> {
 					cmJob.setFixedCost(simCompList[upcomingFailure.compNo].getCMFixedCost());
 					cmJob.setCompNo(upcomingFailure.compNo);
 					simSchedule.addJobTop(cmJob);
-					continue;
+					current = simSchedule.peek();
 				}
 				
 				if(current.getJobType() == Job.JOB_NORMAL){
 					for(Component comp : simCompList)
 						comp.initAge++;
+					runTime++;
 				}
 				else if(current.getJobType() == Job.JOB_PM){
 					pmCost += current.getFixedCost() + current.getJobCost()/Macros.TIME_SCALE_FACTOR;
@@ -91,14 +95,20 @@ public class SimulationThread implements Callable<SimulationResult> {
 					current.setFixedCost(0);
 				}
 				// decrement job time by unit time
-				
+				try {
 				simSchedule.decrement(1);
+				}catch (IOException e){
+				
+				}
 				time++;
 				
 				if(current.getJobTime()<=0){
 					switch(current.getJobType())
 					{
+					case Job.JOB_NORMAL:
+						break;
 					case Job.JOB_PM:
+						pmJobs++;
 						Component comp1 = simCompList[current.getCompNo()];
 						comp1.initAge = (1-comp1.pmRF)*comp1.initAge;
 						// recompute component failures
@@ -120,7 +130,8 @@ public class SimulationThread implements Callable<SimulationResult> {
 							upcomingFailure =  failureEvents.pop();
 						}
 						break;
-					case Job.JOB_CM:	
+					case Job.JOB_CM:
+						cmJobs++;
 						Component comp = simCompList[current.getCompNo()];
 						comp.initAge = (1 - comp.cmRF)*comp.initAge;
 						// recompute component failures
@@ -143,8 +154,13 @@ public class SimulationThread implements Callable<SimulationResult> {
 						break;
 					}
 					
-						simSchedule.remove();
-						
+						try {
+							simSchedule.remove();
+						} catch (IOException e) {
+							// TODO Auto-generated catch block
+							e.printStackTrace();
+							
+						}
 				}
 			}
 			try{
@@ -174,6 +190,8 @@ public class SimulationThread implements Callable<SimulationResult> {
 			totalCost +=  pmCost + cmCost + penaltyCost;
 
 		}
+		//System.out.format("CM:%d PM:%d\n",cmJobs/1000,pmJobs/1000);
+		//System.out.format("Availability: %f \n",runTime/14400);
 		totalCost /= noOfSimulations;
 		pmAvgTime /= noOfSimulations;
 		return new SimulationResult(totalCost,pmAvgTime,compCombo,pmOpportunity,noPM,Main.machines.indexOf(machine));

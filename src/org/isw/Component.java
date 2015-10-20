@@ -101,7 +101,7 @@ public class Component implements Serializable{
 	}
 	
 	public double getCMTTR(){
-		return normalRandom(cmMuRep,cmSigmaRep) + normalRandom(cmMuSupp,cmSigmaSupp);
+		return normalRandom(cmMuRep,cmSigmaRep)+  normalRandom(cmMuSupp,cmSigmaSupp);
 	}
 	
 	public double getCMTTF(){
@@ -112,10 +112,9 @@ public class Component implements Serializable{
 	{
 	RandomGenerator rg = new JDKRandomGenerator();
 	GaussianRandomGenerator g= new GaussianRandomGenerator(rg);	
-	double a=(double) (mean+g.nextNormalizedDouble()*sd);
-	return a;
+	return (double)(mean+g.nextNormalizedDouble()*sd);
+
 	}
-	
 	public static double weibull(double p, double q, double agein) 
 	{		
 		//p beta and q eta 
@@ -181,7 +180,7 @@ public class Component implements Serializable{
 	public static long notZero(double input)
 	{
 		long output = (long) input;
-		if(output == 0)
+		if(output <= 0)
 			output = 1;
 		return output;
 	}

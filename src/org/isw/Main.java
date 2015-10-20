@@ -35,17 +35,26 @@ public class Main {
 	public static void main(String args[]) throws InterruptedException, ExecutionException
 	{
 		Macros.loadMacros();
-		parseJobs();
+		
 		System.out.println("Enter number of days to simulate:");
 		Scanner in = new Scanner(System.in);
 		int shiftCount = in.nextInt()*24/Macros.SHIFT_DURATION;
 		System.out.println("Enter number of machines:");
 		noOfMachines = in.nextInt();
 		for(int i=0;i<noOfMachines;i++){
-			machines.add(new Machine(i ,in));
+			System.out.println("Enter no of components of machine "+(i+1)+":");
+			int n = in.nextInt();
+			int compIndex[] = new int[n];
+			System.out.println("Enter component indices:");
+			for(int j=0;j<n;j++){
+				compIndex[j] = in.nextInt();
+			}
+			machines.add(new Machine(i,compIndex));
 			mainSchedules.add(new Schedule());
 			minSchedules.add(mainSchedules.get(i));
 		}
+		in.close();
+		parseJobs();
 		minCost = Double.MAX_VALUE;
 		int shiftNo = 0;
 		//Main loop
@@ -66,7 +75,9 @@ public class Main {
 			CompletionService<ArrayList<SimulationResult>> pool = new ExecutorCompletionService<ArrayList<SimulationResult>>(threadPool);
 			int cnt=0;
 			
-			table = new ArrayList<ArrayList<SimulationResult>>();	
+			table = new ArrayList<ArrayList<SimulationResult>>();
+			
+			
 			System.out.println("Planning...");
 			long startTime = System.nanoTime();
 			while(!pq.isEmpty()){
@@ -86,16 +97,20 @@ public class Main {
 							}
 							else{
 								// start time of PM job is finishing time of job before it
-								results.get(j).startTimes[pmOpp] = mainSchedules.get(i).getFinishingTime(results.get(j).pmOpportunity.get(pmOpp)-1);
+								results.get(j).startTimes[pmOpp] = mainSchedules.get(results.get(j).id).getFinishingTime(results.get(j).pmOpportunity.get(pmOpp)-1);
 							}
 						}
 					
 				}
-				System.out.println(results.size());
-				table.add(results);
-			
+				
+				if(results.size() > 0)
+				{	
+					System.out.println("Machine "+(results.get(0).id+1)+": Number of PM schedules:"+results.size());
+					table.add(results);
+				
+				}
 			}
-
+			Collections.sort(table, new MachineComparator());
 			threadPool.shutdown();
 			while(!threadPool.isTerminated());
 			pmLabourAssignment = new LabourAvailability(new int[]{1,0,0}, Macros.SHIFT_DURATION*Macros.TIME_SCALE_FACTOR);
@@ -111,35 +126,35 @@ public class Main {
 				}
 			}
 			System.out.println("Calculating permutations");
-			
-			for(int i=0;i<table.get(0).size();i++)
-				calculatePermutations(table.get(0).get(i),pmLabourAssignment); 
+			if(table.size() > 0)
+				for(int i=0;i<table.get(0).size();i++)
+					calculatePermutations(table.get(0).get(i), 0 , pmLabourAssignment); 
 			
 			runTime = (System.nanoTime() - startTime)/Math.pow(10, 9);
 			mainSchedules = minSchedules;
-			
-			calculateCost(false);
+			for(int i=0;i<Macros.SIMULATION_COUNT;i++)
+				calculateCost(false);
 		}	
 		System.out.format("Planning time: %f\n",runTime);
 		for(Machine machine : machines)
-			writeResults(machine);
+			writeResults(machine,Macros.SIMULATION_COUNT);
 	}
-	private static void calculatePermutations(SimulationResult row, LabourAvailability pmLabourAssignment) throws InterruptedException, ExecutionException {
+	
+	private static void calculatePermutations(SimulationResult row, int level, LabourAvailability pmLabourAssignment) throws InterruptedException, ExecutionException {
+		//pmLabourAssignment.print();
 		Schedule temp = new Schedule(mainSchedules.get(row.id));
 		LabourAvailability tempLabour = new LabourAvailability(pmLabourAssignment);
-		assignLabour(row,pmLabourAssignment);
-		if(row.id == noOfMachines - 1){
+		assignLabour(row,tempLabour);
+		if(level == table.size()-1){
 			calculateCost(true);
 		}
 		else {
-			for(int j=0;j<table.get(row.id+1).size(); j++){
-				calculatePermutations(table.get(row.id+1).get(j),pmLabourAssignment);
+			for(int j=0;j<table.get(level+1).size(); j++){
+				calculatePermutations(table.get(level+1).get(j),level+1,pmLabourAssignment);
 			}
 		}
-		pmLabourAssignment = tempLabour;
 		mainSchedules.set(row.id, temp);
 	}
-
 	private static void calculateCost(boolean isPlanning) throws InterruptedException, ExecutionException {
 		ExecutorService threadPool = Executors.newFixedThreadPool(noOfMachines);
 		CompletionService<Double> pool = new ExecutorCompletionService<Double>(threadPool);
@@ -149,9 +164,12 @@ public class Main {
 			pool.submit(new JobExecThread(mainSchedules.get(i),machines.get(i),isPlanning,sync));
 		}
 		Double cost = 0d;
+
 		for(int i=0;i<noOfMachines;i++){
 			cost += pool.take().get();
 		}
+		threadPool.shutdown();
+		while(!threadPool.isTerminated());
 		if(isPlanning){
 			if(cost < minCost){
 				minCost = cost;
@@ -164,9 +182,11 @@ public class Main {
 	static void assignLabour(SimulationResult row, LabourAvailability pmLabour){
 		Component[] compList = machines.get(row.id).compList;
 		row.pmTTRs = new long[row.pmOpportunity.size()][compList.length];
+		
 		// check if schedule is empty
 		if(!mainSchedules.get(row.id).isEmpty())
 		{
+			
 			// generate PM TTRs of all components undergoing PM for this row
 			boolean meetsReqForAllOpp = true;
 			int[][] seriesLabour = new int[row.pmOpportunity.size()][3];
@@ -195,6 +215,7 @@ public class Main {
 						if(seriesLabour[pmOpp][2] < labour1[2])
 							seriesLabour[pmOpp][2] = labour1[2];
 					}
+					
 				}
 				if(!pmLabour.checkAvailability(row.startTimes[pmOpp], row.startTimes[pmOpp]+seriesTTR[pmOpp], seriesLabour[pmOpp]))
 				{
@@ -206,6 +227,7 @@ public class Main {
 			
 			if(meetsReqForAllOpp)
 			{
+				
 				//incorporate the PM job(s) into schedule of machine
 				addPMJobs(mainSchedules.get(row.id), machines.get(row.id).compList, row, seriesTTR, seriesLabour);
 				//reserve labour
@@ -260,7 +282,7 @@ public class Main {
 			XSSFWorkbook workbook = new XSSFWorkbook(file);
 			XSSFSheet sheet = workbook.getSheetAt(0);
 
-			for(int i=1;i<=9;i++)
+			for(int i=1;i<=noOfMachines*3;i++)
 			{
 				Row row = sheet.getRow(i);
 				int demand = (int) row.getCell(5).getNumericCellValue();
@@ -286,24 +308,28 @@ public class Main {
 	}
 
 
-	private static void writeResults(Machine machine) {
-
+	private static void writeResults(Machine machine, int simCount) {
+		double cost = machine.cmCost + machine.pmCost + machine.penaltyCost;
+		double downtime = (machine.cmDownTime + machine.pmDownTime + machine.waitTime)/simCount;
+		double runtime = 1440 - machine.idleTime/simCount;
+		double availability = 100  - 100*downtime/runtime;
 		System.out.println("=========================================");
 		System.out.println("Machine "+ (machine.machineNo+1));
+		System.out.format("%f| %f \n",availability,cost/simCount);
 		//System.out.println("Downtime:" + String.valueOf(machine.downTime*100/(machine.runTime)) +"%");
-		System.out.println("CM Downtime: "+ machine.cmDownTime +" hours");
-		System.out.println("PM Downtime: "+ machine.pmDownTime +" hours");
-		System.out.println("Waiting Downtime: "+ machine.waitTime +" hours");
-		System.out.println("Machine Idle time: "+ machine.idleTime+" hours");
-		System.out.println("PM Cost: "+ machine.pmCost);
-		System.out.println("CM Cost: "+ machine.cmCost);
-		System.out.println("Penalty Cost: "+ machine.penaltyCost);
-		System.out.println("Processing Cost: "+ machine.procCost);
-		System.out.println("Number of jobs:" + machine.jobsDone);
-		System.out.println("Number of CM jobs:" + machine.cmJobsDone);
-		System.out.println("Number of PM jobs:" + machine.pmJobsDone);
+		System.out.println("CMDowntime: "+ machine.cmDownTime/simCount +" hours");
+		System.out.println("PM Downtime: "+ machine.pmDownTime/simCount +" hours");
+		System.out.println("Waiting Downtime: "+ machine.waitTime/simCount +" hours");
+		System.out.println("Machine Idle time: "+ machine.idleTime/simCount+" hours");
+		System.out.println("PM Cost: "+ machine.pmCost/simCount);
+		System.out.println("CM Cost: "+ machine.cmCost/simCount);
+		System.out.println("Penalty Cost: "+ machine.penaltyCost/simCount);
+		System.out.println("Processing Cost: "+ machine.procCost/simCount);
+		System.out.println("Number of jobs:" + (double)machine.jobsDone/simCount);
+		System.out.println("Number of CM jobs:" + (double)machine.cmJobsDone/simCount);
+		System.out.println("Number of PM jobs:" + (double)machine.pmJobsDone/simCount);
 		for(int i=0 ;i<machine.compList.length; i++)
-			System.out.println("Component "+String.valueOf(i+1)+": PM "+machine.compPMJobsDone[i]+"|CM"+machine.compCMJobsDone[i]);
+			System.out.println("Component "+machine.compList[i].compName+": PM "+(double)machine.compPMJobsDone[i]/simCount+"|CM "+(double)machine.compCMJobsDone[i]/simCount);
 		
 	}
 	

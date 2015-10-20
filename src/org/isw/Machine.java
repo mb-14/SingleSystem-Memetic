@@ -2,7 +2,6 @@ package org.isw;
 
 import java.io.File;
 import java.io.FileInputStream;
-import java.util.Scanner;
 
 import org.apache.poi.ss.usermodel.Row;
 import org.apache.poi.xssf.usermodel.XSSFSheet;
@@ -32,10 +31,8 @@ public class Machine {
 	public  long idleTime;
 
 	
-	public Machine(int machineNo, Scanner in){
-		System.out.println("Enter no of components of machine "+(machineNo+1)+":");
-		int n = in.nextInt();
-		compList = parseExcel(n);
+	public Machine(int machineNo, int[] compIndex){
+		compList = parseExcel(compIndex);
 		downTime = 0;
 		jobsDone = 0;
 		cmJobsDone = pmJobsDone = 0;
@@ -54,7 +51,7 @@ public class Machine {
 		this.machineNo = machineNo;
 	}
 	
-	private static Component[] parseExcel(int n) {
+	private Component[] parseExcel(int[] compIndex) {
 		/**
 		 * Parse the component excel file into a list of components.
 		 * Total number of components should be 14 for our experiment.
@@ -62,18 +59,18 @@ public class Machine {
 		 * to one for now)
 		 * 
 		 * */
-		Component[] c = new Component[n];
+		Component[] c = new Component[compIndex.length];
 		try
-		{
+		{ 
 			FileInputStream file = new FileInputStream(new File("components.xlsx"));
 			XSSFWorkbook workbook = new XSSFWorkbook(file);
 			XSSFSheet sheet = workbook.getSheetAt(0);
-			XSSFSheet labourSheet = workbook.getSheetAt(1);
-			for(int i=5;i<5+n;i++)
+			int cnt = 0;
+			for(int index : compIndex)
 			{
-				Row row = sheet.getRow(i);
+				index += 4;
+				Row row = sheet.getRow(index);
 				Component comp = new Component();
-
 				//--------CM data------------
 				//0 is assembly name
 				comp.compName = row.getCell(1).getStringCellValue();
@@ -101,18 +98,11 @@ public class Machine {
 				comp.pmRF = row.getCell(21).getNumericCellValue();
 				comp.pmCostSpare = row.getCell(22).getNumericCellValue();
 				comp.pmCostOther = row.getCell(23).getNumericCellValue();
-				row = labourSheet.getRow(i);
-				comp.labourCost = new double[]{800,500,300};
-				comp.pmLabour = new int[3];
-				comp.pmLabour[0] = (int)row.getCell(3).getNumericCellValue();
-				comp.pmLabour[1] = (int)row.getCell(5).getNumericCellValue();
-				comp.pmLabour[2] = (int)row.getCell(7).getNumericCellValue();
-				comp.cmLabour = new int[3];
-				comp.cmLabour[0] = (int)row.getCell(2).getNumericCellValue();
-				comp.cmLabour[1] = (int)row.getCell(4).getNumericCellValue();
-				comp.cmLabour[2] = (int)row.getCell(6).getNumericCellValue();
-				comp.initProps(i-5);
-				c[i-5] = comp;
+				comp.labourCost = new double[]{500,500,300};
+				comp.pmLabour = new int[]{1,0,0};
+				comp.cmLabour = new int[]{1,0,0};
+				//comp.initProps(index-4);
+				c[cnt++] = comp;
 			}
 			file.close();
 
