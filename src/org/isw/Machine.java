@@ -65,6 +65,7 @@ public class Machine {
 			FileInputStream file = new FileInputStream(new File("components.xlsx"));
 			XSSFWorkbook workbook = new XSSFWorkbook(file);
 			XSSFSheet sheet = workbook.getSheetAt(0);
+			XSSFSheet labourSheet = workbook.getSheetAt(1);
 			int cnt = 0;
 			for(int index : compIndex)
 			{
@@ -98,9 +99,16 @@ public class Machine {
 				comp.pmRF = row.getCell(21).getNumericCellValue();
 				comp.pmCostSpare = row.getCell(22).getNumericCellValue();
 				comp.pmCostOther = row.getCell(23).getNumericCellValue();
-				comp.labourCost = new double[]{500,500,300};
-				comp.pmLabour = new int[]{1,0,0};
-				comp.cmLabour = new int[]{1,0,0};
+				comp.labourCost = new double[]{800,500,300};
+				row = labourSheet.getRow(index);
+				comp.pmLabour = new int[3];
+				comp.pmLabour[0] = (int)row.getCell(3).getNumericCellValue();
+				comp.pmLabour[1] = (int)row.getCell(5).getNumericCellValue();
+				comp.pmLabour[2] = (int)row.getCell(7).getNumericCellValue();
+				comp.cmLabour = new int[3];
+				comp.cmLabour[0] = (int)row.getCell(2).getNumericCellValue();
+				comp.cmLabour[1] = (int)row.getCell(4).getNumericCellValue();
+				comp.cmLabour[2] = (int)row.getCell(6).getNumericCellValue();
 				//comp.initProps(index-4);
 				c[cnt++] = comp;
 			}

@@ -14,11 +14,13 @@ public class JobExecThread implements Callable<Double>{
 	Machine machine;
 	boolean isPlanning;
 	CyclicBarrier sync;
-	public JobExecThread(Schedule schedule, Machine machine, boolean isPlanning, CyclicBarrier sync){
+	Object lock;
+	public JobExecThread(Schedule schedule, Machine machine, boolean isPlanning, CyclicBarrier sync,Object lock){
 		this.schedule = schedule;
 		this.machine = machine;
 		this.isPlanning = isPlanning;
 		this.sync = sync;
+		this.lock = lock;
 	}
 	public Double call() throws InterruptedException, BrokenBarrierException{
 		int count = 1;
@@ -108,10 +110,15 @@ public class JobExecThread implements Callable<Double>{
 
 				if(machine.getStatus() == Macros.MACHINE_WAITING_FOR_CM_LABOUR || machine.getStatus() == Macros.MACHINE_WAITING_FOR_PM_LABOUR)
 				{
-
-					if(Main.labour.compareAndSet(true, true))
+					int[] labour_req = null;
+					if(current.getJobType() == Job.JOB_CM)
+						labour_req = compList[current.getCompNo()].getCMLabour();
+					else if(current.getJobType() == Job.JOB_PM)
+						labour_req = compList[current.getCompNo()].getPMLabour();
+					synchronized(lock){
+					if(checkLabour(labour_req))
 					{
-						Main.labour.set(false);
+						employLabour(labour_req);
 						// labour is available, perform maintenance job
 						if(current.getJobType() == Job.JOB_CM)
 							machine.setStatus(Macros.MACHINE_CM);
@@ -132,7 +139,7 @@ public class JobExecThread implements Callable<Double>{
 							machine.waitTime++;
 						}
 					}
-					
+					}
 				}
 
 				else if(current.getJobType() == Job.JOB_NORMAL)
@@ -225,7 +232,9 @@ public class JobExecThread implements Callable<Double>{
 						// let maintenance know how much labour has been released (for logging purpose only)
 						if(jobList.getSize()<=1 || jobList.jobAt(1).getStatus()!=Job.SERIES_STARTED)
 						{
-							Main.labour.set(true);
+							synchronized(lock){
+							freeLabour(compList[current.getCompNo()].getPMLabour());
+							}
 						}
 
 						// recompute component failures
@@ -257,7 +266,9 @@ public class JobExecThread implements Callable<Double>{
 							machine.compCMJobsDone[current.getCompNo()]++;
 						}
 						// let maintenance know how much labour has been released (for logging purpose only)
-						Main.labour.set(true);
+						synchronized(lock){
+							freeLabour(compList[current.getCompNo()].getCMLabour());
+							}
 						// recompute component failures
 						failureEvents = new LinkedList<FailureEvent>();
 						upcomingFailure = null;
@@ -308,6 +319,21 @@ public class JobExecThread implements Callable<Double>{
 			System.gc();
 		}
 		return cost/Macros.SIMULATION_COUNT;
+	}
+	private void employLabour(int[] labour) {
+		for(int i=0;i<labour.length;i++)
+			 Main.labour[i] -= labour[i];
+		
+	}
+	private boolean checkLabour(int[] labour) {
+		for(int i=0;i<labour.length;i++)
+		 if(Main.labour[i] < labour[i])
+			 return false;
+		return true;
+	}
+	private void freeLabour(int[] labour){
+		for(int i=0;i<labour.length;i++)
+			 Main.labour[i] += labour[i];
 	}
 	private void timeSync() throws InterruptedException, BrokenBarrierException {
 		// TODO Auto-generated method stub

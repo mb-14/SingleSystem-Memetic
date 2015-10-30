@@ -29,7 +29,7 @@ public class Main {
 	static ArrayList<Machine> machines = new ArrayList<Machine>();
 	static int noOfMachines =0;
 	static LabourAvailability pmLabourAssignment;
-	public static AtomicBoolean labour;
+	public static int[] labour;
 	static Double minCost;
 	static double runTime;
 	public static void main(String args[]) throws InterruptedException, ExecutionException
@@ -80,10 +80,14 @@ public class Main {
 			
 			System.out.println("Planning...");
 			long startTime = System.nanoTime();
-			while(!pq.isEmpty()){
+			int count =0;
+			for(int j=0;j<noOfMachines;j++){
 				cnt++;
-				Schedule sched = pq.poll();
-				pool.submit(new MachineThread(sched,mainSchedules.indexOf(sched)));
+				Schedule sched = new Schedule();
+				for(int i=0;i<7;i++){
+					sched.addJob(jobArray.get(count++));		
+				}
+				pool.submit(new MachineThread(sched,j));
 			}
 			for(int i=0;i<cnt;i++){
 				ArrayList<SimulationResult> results  = pool.take().get();	
@@ -159,9 +163,10 @@ public class Main {
 		ExecutorService threadPool = Executors.newFixedThreadPool(noOfMachines);
 		CompletionService<Double> pool = new ExecutorCompletionService<Double>(threadPool);
 		CyclicBarrier sync = new CyclicBarrier(noOfMachines);
-		labour = new AtomicBoolean(true);
+		labour = new int[]{2,4,8};
+		Object lock = new Object();
 		for(int i=0;i<noOfMachines;i++){
-			pool.submit(new JobExecThread(mainSchedules.get(i),machines.get(i),isPlanning,sync));
+			pool.submit(new JobExecThread(mainSchedules.get(i),machines.get(i),isPlanning,sync,lock));
 		}
 		Double cost = 0d;
 
@@ -272,28 +277,22 @@ public class Main {
 	}
 	private static void parseJobs() 
 	{
-		/*
-		 * Get jobs from Excel sheet
-		 */
 		jobArray = new ArrayList<Job>();
 		try
 		{
 			FileInputStream file = new FileInputStream(new File("Jobs.xlsx"));
 			XSSFWorkbook workbook = new XSSFWorkbook(file);
 			XSSFSheet sheet = workbook.getSheetAt(0);
-
-			for(int i=1;i<=noOfMachines*3;i++)
+			
+			for(int i=1;i<= noOfMachines*7;i++)
 			{
 				Row row = sheet.getRow(i);
-				int demand = (int) row.getCell(5).getNumericCellValue();
 				String jobName = row.getCell(0).getStringCellValue();
 				long jobTime = (long)(row.getCell(1).getNumericCellValue()*Macros.TIME_SCALE_FACTOR);
-				double jobCost = row.getCell(3).getNumericCellValue();
-				for(int j=0; j<demand ;j++){
-					Job job = new Job(jobName,jobTime,jobCost,Job.JOB_NORMAL);
-					job.setPenaltyCost(row.getCell(4).getNumericCellValue());
-					jobArray.add(job);
-				}
+				double jobCost = row.getCell(3).getNumericCellValue();	
+				Job job = new Job(jobName,jobTime,jobCost,Job.JOB_NORMAL);
+				job.setPenaltyCost(row.getCell(4).getNumericCellValue());
+				jobArray.add(job);
 			}
 			file.close();
 		}
@@ -301,10 +300,6 @@ public class Main {
 		{
 			e.printStackTrace();
 		}	
-		//sort jobs in descending order of job time
-
-		Collections.sort(jobArray, new JobComparator());
-
 	}
 
 
