@@ -59,7 +59,7 @@ public class JobExecThread implements Callable<Double>{
 				Collections.sort(failureEvents, new FailureEventComparator());
 				upcomingFailure =  failureEvents.pop();
 			}
-
+			machine.setStatus(Macros.MACHINE_PLANNING);
 			while(true)
 			{
 
@@ -78,6 +78,9 @@ public class JobExecThread implements Callable<Double>{
 				}
 
 				if(jobList.isEmpty()){
+					System.out.println(time);
+					System.out.println(schedule.printSchedule());
+					System.exit(0);
 					timeSync();
 					time++;
 					if(!isPlanning)
@@ -111,10 +114,12 @@ public class JobExecThread implements Callable<Double>{
 				if(machine.getStatus() == Macros.MACHINE_WAITING_FOR_CM_LABOUR || machine.getStatus() == Macros.MACHINE_WAITING_FOR_PM_LABOUR)
 				{
 					int[] labour_req = null;
-					if(current.getJobType() == Job.JOB_CM)
+					if(current.getJobType() == Job.JOB_CM){
 						labour_req = compList[current.getCompNo()].getCMLabour();
-					else if(current.getJobType() == Job.JOB_PM)
+					}
+					else if(current.getJobType() == Job.JOB_PM){
 						labour_req = compList[current.getCompNo()].getPMLabour();
+						}
 					synchronized(lock){
 					if(checkLabour(labour_req))
 					{
@@ -233,7 +238,7 @@ public class JobExecThread implements Callable<Double>{
 						if(jobList.getSize()<=1 || jobList.jobAt(1).getStatus()!=Job.SERIES_STARTED)
 						{
 							synchronized(lock){
-							freeLabour(compList[current.getCompNo()].getPMLabour());
+								freeLabour(compList[current.getCompNo()].getPMLabour());
 							}
 						}
 
@@ -316,7 +321,7 @@ public class JobExecThread implements Callable<Double>{
 			} //Loop ends 
 			jobList = null;
 			compList = null;
-			System.gc();
+			//System.gc();
 		}
 		return cost/Macros.SIMULATION_COUNT;
 	}

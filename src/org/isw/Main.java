@@ -1,7 +1,11 @@
 package org.isw;
 
+import java.io.BufferedWriter;
 import java.io.File;
 import java.io.FileInputStream;
+import java.io.FileWriter;
+import java.io.IOException;
+import java.io.PrintWriter;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
@@ -14,7 +18,6 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorCompletionService;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
-import java.util.concurrent.atomic.AtomicBoolean;
 
 import org.apache.poi.ss.usermodel.Row;
 import org.apache.poi.xssf.usermodel.XSSFSheet;
@@ -31,7 +34,7 @@ public class Main {
 	static LabourAvailability pmLabourAssignment;
 	public static int[] labour;
 	static Double minCost;
-	static double runTime;
+	static double planningTime;
 	public static void main(String args[]) throws InterruptedException, ExecutionException
 	{
 		Macros.loadMacros();
@@ -59,7 +62,7 @@ public class Main {
 		int shiftNo = 0;
 		//Main loop
 		while(shiftNo++ < shiftCount){
-			PriorityQueue<Schedule> pq = new PriorityQueue<Schedule>();
+			/*PriorityQueue<Schedule> pq = new PriorityQueue<Schedule>();
 			for(Schedule sched : mainSchedules)
 				pq.add(sched);					
 			
@@ -69,7 +72,7 @@ public class Main {
 				min.addJob(new Job(jobArray.get(i)));
 				System.out.print(jobArray.get(i).getJobName()+": "+String.valueOf(jobArray.get(i).getJobTime()/Macros.TIME_SCALE_FACTOR)+" ");
 				pq.add(min);
-			}
+			}*/
 			System.out.println("");
 			ExecutorService threadPool = Executors.newFixedThreadPool(noOfMachines);
 			CompletionService<ArrayList<SimulationResult>> pool = new ExecutorCompletionService<ArrayList<SimulationResult>>(threadPool);
@@ -83,8 +86,8 @@ public class Main {
 			int count =0;
 			for(int j=0;j<noOfMachines;j++){
 				cnt++;
-				Schedule sched = new Schedule();
-				for(int i=0;i<7;i++){
+				Schedule sched = mainSchedules.get(j);
+				for(int i=0;i<3;i++){
 					sched.addJob(jobArray.get(count++));		
 				}
 				pool.submit(new MachineThread(sched,j));
@@ -117,7 +120,7 @@ public class Main {
 			Collections.sort(table, new MachineComparator());
 			threadPool.shutdown();
 			while(!threadPool.isTerminated());
-			pmLabourAssignment = new LabourAvailability(new int[]{1,0,0}, Macros.SHIFT_DURATION*Macros.TIME_SCALE_FACTOR);
+			pmLabourAssignment = new LabourAvailability(new int[]{2,4,8}, Macros.SHIFT_DURATION*Macros.TIME_SCALE_FACTOR);
 			for(int i=0; i<mainSchedules.size(); i++)
 			{
 				Schedule sched = mainSchedules.get(i);
@@ -134,12 +137,12 @@ public class Main {
 				for(int i=0;i<table.get(0).size();i++)
 					calculatePermutations(table.get(0).get(i), 0 , pmLabourAssignment); 
 			
-			runTime = (System.nanoTime() - startTime)/Math.pow(10, 9);
+			planningTime = (System.nanoTime() - startTime)/Math.pow(10, 9);
 			mainSchedules = minSchedules;
 			for(int i=0;i<Macros.SIMULATION_COUNT;i++)
 				calculateCost(false);
 		}	
-		System.out.format("Planning time: %f\n",runTime);
+		System.out.format("Planning time: %f\n",planningTime);
 		for(Machine machine : machines)
 			writeResults(machine,Macros.SIMULATION_COUNT);
 	}
@@ -280,11 +283,11 @@ public class Main {
 		jobArray = new ArrayList<Job>();
 		try
 		{
-			FileInputStream file = new FileInputStream(new File("Jobs.xlsx"));
+			FileInputStream file = new FileInputStream(new File("Jobs_3.xlsx"));
 			XSSFWorkbook workbook = new XSSFWorkbook(file);
 			XSSFSheet sheet = workbook.getSheetAt(0);
 			
-			for(int i=1;i<= noOfMachines*7;i++)
+			for(int i=1;i<= noOfMachines*3;i++)
 			{
 				Row row = sheet.getRow(i);
 				String jobName = row.getCell(0).getStringCellValue();
@@ -326,7 +329,33 @@ public class Main {
 		for(int i=0 ;i<machine.compList.length; i++)
 			System.out.println("Component "+machine.compList[i].compName+": PM "+(double)machine.compPMJobsDone[i]/simCount+"|CM "+(double)machine.compCMJobsDone[i]/simCount);
 		
+		try(PrintWriter out = new PrintWriter(new BufferedWriter(new FileWriter("results.csv",true)))){ 
+			for(int i=0;i<machine.compList.length;i++)
+				out.format("%s;", machine.compList[i].compName);
+			out.print(",");
+			out.format("%f,", planningTime);
+			out.format("%f,", availability);
+			out.format("%d,",  machine.idleTime/simCount);
+			out.format("%d,", machine.pmDownTime/simCount);
+			out.format("%d,",  machine.cmDownTime/simCount);
+			out.format("%d,", machine.waitTime/simCount);
+			out.format("%f,",  machine.pmCost/simCount);
+			out.format("%f,", machine.cmCost/simCount);
+			out.format("%d,",  machine.penaltyCost/simCount);
+			out.print(" ,");
+			out.format("%d,",  machine.procCost/simCount);
+			out.print(" ,");
+			out.format("%f,",  (double)machine.jobsDone/simCount);
+			out.format("%f,", (double)machine.pmJobsDone/simCount);
+			out.format("%f\n",  (double)machine.cmJobsDone/simCount);
+		
+		}
+		catch(IOException e){
+
+		}
+	
 	}
+	
 	
 }
 class JobComparator implements Comparator<Job> {

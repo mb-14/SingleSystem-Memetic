@@ -43,8 +43,10 @@ public class MachineThread implements Callable<ArrayList<SimulationResult>> {
 		for(int i=0;i<cnt;i++)
 		{
 			SimulationResult result = pool.take().get();
-			if(noPM.cost > result.cost)
+			if(noPM.cost > result.cost){
+				result.cost = noPM.cost - result.cost;
 				results.add(result);
+				}
 		}	
 		threadPool.shutdown();
 		while(!threadPool.isTerminated());
