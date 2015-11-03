@@ -7,9 +7,7 @@ import java.io.FileWriter;
 import java.io.IOException;
 import java.io.PrintWriter;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.Comparator;
-import java.util.PriorityQueue;
 import java.util.Random;
 import java.util.Scanner;
 import java.util.concurrent.CompletionService;
@@ -32,13 +30,11 @@ public class Main {
 	static ArrayList<Machine> machines = new ArrayList<Machine>();
 	static int noOfMachines =0;
 	static LabourAvailability pmLabourAssignment;
-	public static int[] labour;
 	static Double minCost;
 	static double planningTime;
-	public static void main(String args[]) throws InterruptedException, ExecutionException
+	public static void main(String args[]) throws InterruptedException, ExecutionException, NumberFormatException, IOException
 	{
 		Macros.loadMacros();
-		
 		System.out.println("Enter number of days to simulate:");
 		Scanner in = new Scanner(System.in);
 		int shiftCount = in.nextInt()*24/Macros.SHIFT_DURATION;
@@ -62,83 +58,22 @@ public class Main {
 		int shiftNo = 0;
 		//Main loop
 		while(shiftNo++ < shiftCount){
-			/*PriorityQueue<Schedule> pq = new PriorityQueue<Schedule>();
-			for(Schedule sched : mainSchedules)
-				pq.add(sched);					
-			
-			System.out.println("Job list: ");
-			for(int i=0;i<jobArray.size();i++){
-				Schedule min = pq.remove();
-				min.addJob(new Job(jobArray.get(i)));
-				System.out.print(jobArray.get(i).getJobName()+": "+String.valueOf(jobArray.get(i).getJobTime()/Macros.TIME_SCALE_FACTOR)+" ");
-				pq.add(min);
-			}*/
+
 			System.out.println("");
-			ExecutorService threadPool = Executors.newFixedThreadPool(noOfMachines);
-			CompletionService<ArrayList<SimulationResult>> pool = new ExecutorCompletionService<ArrayList<SimulationResult>>(threadPool);
-			int cnt=0;
-			
-			table = new ArrayList<ArrayList<SimulationResult>>();
-			
 			
 			System.out.println("Planning...");
 			long startTime = System.nanoTime();
 			int count =0;
 			for(int j=0;j<noOfMachines;j++){
-				cnt++;
 				Schedule sched = mainSchedules.get(j);
 				for(int i=0;i<3;i++){
 					sched.addJob(jobArray.get(count++));		
 				}
-				pool.submit(new MachineThread(sched,j));
 			}
-			for(int i=0;i<cnt;i++){
-				ArrayList<SimulationResult> results  = pool.take().get();	
-				for(int j=0;j<results.size();j++)
-				{
-						for(int pmOpp=0; pmOpp < results.get(j).pmOpportunity.size(); pmOpp++)
-						{
-							// calculate start times for each job in SimulationResult
-							if(results.get(j).pmOpportunity.get(pmOpp) <= 0){
-								results.get(j).startTimes[pmOpp] = 0; //assign calculated t
-							}
-							else{
-								// start time of PM job is finishing time of job before it
-								results.get(j).startTimes[pmOpp] = mainSchedules.get(results.get(j).id).getFinishingTime(results.get(j).pmOpportunity.get(pmOpp)-1);
-							}
-						}
-					
-				}
-				
-				if(results.size() > 0)
-				{	
-					System.out.println("Machine "+(results.get(0).id+1)+": Number of PM schedules:"+results.size());
-					table.add(results);
-				
-				}
-			}
-			Collections.sort(table, new MachineComparator());
-			threadPool.shutdown();
-			while(!threadPool.isTerminated());
-			pmLabourAssignment = new LabourAvailability(new int[]{2,4,8}, Macros.SHIFT_DURATION*Macros.TIME_SCALE_FACTOR);
-			for(int i=0; i<mainSchedules.size(); i++)
-			{
-				Schedule sched = mainSchedules.get(i);
-				if(!sched.isEmpty() && sched.jobAt(0).getJobType()==Job.JOB_PM)
-				{
-					//pending PM job present in this schedule
-					System.out.println("Reserving Labour for previous shift PM job");
-					//reserve labour for it
-					pmLabourAssignment.employLabour(0, sched.jobAt(0).getSeriesTTR(), sched.jobAt(0).getSeriesLabour());
-				}
-			}
-			System.out.println("Calculating permutations");
-			if(table.size() > 0)
-				for(int i=0;i<table.get(0).size();i++)
-					calculatePermutations(table.get(0).get(i), 0 , pmLabourAssignment); 
 			
+			MemeticAlgorithm ma = new MemeticAlgorithm(100,100,mainSchedules,machines,false);
+			mainSchedules = ma.execute();
 			planningTime = (System.nanoTime() - startTime)/Math.pow(10, 9);
-			mainSchedules = minSchedules;
 			for(int i=0;i<Macros.SIMULATION_COUNT;i++)
 				calculateCost(false);
 		}	
@@ -147,29 +82,15 @@ public class Main {
 			writeResults(machine,Macros.SIMULATION_COUNT);
 	}
 	
-	private static void calculatePermutations(SimulationResult row, int level, LabourAvailability pmLabourAssignment) throws InterruptedException, ExecutionException {
-		//pmLabourAssignment.print();
-		Schedule temp = new Schedule(mainSchedules.get(row.id));
-		LabourAvailability tempLabour = new LabourAvailability(pmLabourAssignment);
-		assignLabour(row,tempLabour);
-		if(level == table.size()-1){
-			calculateCost(true);
-		}
-		else {
-			for(int j=0;j<table.get(level+1).size(); j++){
-				calculatePermutations(table.get(level+1).get(j),level+1,pmLabourAssignment);
-			}
-		}
-		mainSchedules.set(row.id, temp);
-	}
+	
 	private static void calculateCost(boolean isPlanning) throws InterruptedException, ExecutionException {
 		ExecutorService threadPool = Executors.newFixedThreadPool(noOfMachines);
 		CompletionService<Double> pool = new ExecutorCompletionService<Double>(threadPool);
 		CyclicBarrier sync = new CyclicBarrier(noOfMachines);
-		labour = new int[]{2,4,8};
+		int[] labour = new int[]{2,4,8};
 		Object lock = new Object();
 		for(int i=0;i<noOfMachines;i++){
-			pool.submit(new JobExecThread(mainSchedules.get(i),machines.get(i),isPlanning,sync,lock));
+			pool.submit(new JobExecThread(mainSchedules.get(i),machines.get(i),isPlanning,sync,lock,labour));
 		}
 		Double cost = 0d;
 

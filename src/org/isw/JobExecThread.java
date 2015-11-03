@@ -15,12 +15,15 @@ public class JobExecThread implements Callable<Double>{
 	boolean isPlanning;
 	CyclicBarrier sync;
 	Object lock;
-	public JobExecThread(Schedule schedule, Machine machine, boolean isPlanning, CyclicBarrier sync,Object lock){
+	int labour[];
+	int status;
+	public JobExecThread(Schedule schedule, Machine machine, boolean isPlanning, CyclicBarrier sync,Object lock, int[] labour){
 		this.schedule = schedule;
 		this.machine = machine;
 		this.isPlanning = isPlanning;
 		this.sync = sync;
 		this.lock = lock;
+		this.labour = labour;
 	}
 	public Double call() throws InterruptedException, BrokenBarrierException{
 		int count = 1;
@@ -28,6 +31,9 @@ public class JobExecThread implements Callable<Double>{
 		if(isPlanning)
 			count = Macros.SIMULATION_COUNT;
 		while(count-- > 0){
+			labour[0] = 2;
+			labour[1] = 4;
+			labour[2] = 8;
 			long time = 0;
 			Component[] compList;
 			Schedule jobList;
@@ -59,7 +65,7 @@ public class JobExecThread implements Callable<Double>{
 				Collections.sort(failureEvents, new FailureEventComparator());
 				upcomingFailure =  failureEvents.pop();
 			}
-			machine.setStatus(Macros.MACHINE_PLANNING);
+			setStatus(Macros.MACHINE_PLANNING);
 			while(true)
 			{
 
@@ -107,11 +113,11 @@ public class JobExecThread implements Callable<Double>{
 					cmJob.setFixedCost(machine.compList[upcomingFailure.compNo].getCMFixedCost());
 					cmJob.setCompNo(upcomingFailure.compNo);
 					jobList.addJobTop(cmJob);
-					machine.setStatus(Macros.MACHINE_WAITING_FOR_CM_LABOUR);
+					setStatus(Macros.MACHINE_WAITING_FOR_CM_LABOUR);
 					current = jobList.peek();
 				}
 
-				if(machine.getStatus() == Macros.MACHINE_WAITING_FOR_CM_LABOUR || machine.getStatus() == Macros.MACHINE_WAITING_FOR_PM_LABOUR)
+				if(getStatus() == Macros.MACHINE_WAITING_FOR_CM_LABOUR || getStatus() == Macros.MACHINE_WAITING_FOR_PM_LABOUR)
 				{
 					int[] labour_req = null;
 					if(current.getJobType() == Job.JOB_CM){
@@ -126,9 +132,9 @@ public class JobExecThread implements Callable<Double>{
 						employLabour(labour_req);
 						// labour is available, perform maintenance job
 						if(current.getJobType() == Job.JOB_CM)
-							machine.setStatus(Macros.MACHINE_CM);
+							setStatus(Macros.MACHINE_CM);
 						if(current.getJobType() == Job.JOB_PM)
-							machine.setStatus(Macros.MACHINE_PM);
+							setStatus(Macros.MACHINE_PM);
 						continue;
 					}
 					else 
@@ -149,13 +155,13 @@ public class JobExecThread implements Callable<Double>{
 
 				else if(current.getJobType() == Job.JOB_NORMAL)
 				{
-					machine.setStatus(Macros.MACHINE_RUNNING_JOB);
+					setStatus(Macros.MACHINE_RUNNING_JOB);
 					current.setStatus(Job.STARTED);
 
 					// no failure, no maintenance. Just increment cost models normally.
 					if(!isPlanning)
 						machine.procCost += current.getJobCost()/Macros.TIME_SCALE_FACTOR;
-					cost += current.getJobCost()/Macros.TIME_SCALE_FACTOR;
+					//cost += current.getJobCost()/Macros.TIME_SCALE_FACTOR;
 					for(Component comp : compList)
 						comp.initAge++;
 					if(!isPlanning)
@@ -164,10 +170,10 @@ public class JobExecThread implements Callable<Double>{
 
 				else if(current.getJobType() == Job.JOB_PM)
 				{
-					if(machine.getStatus() != Macros.MACHINE_PM)
+					if(getStatus() != Macros.MACHINE_PM)
 					{
 						// request PM if labours not yet allocated
-						machine.setStatus(Macros.MACHINE_WAITING_FOR_PM_LABOUR);
+						setStatus(Macros.MACHINE_WAITING_FOR_PM_LABOUR);
 						continue;
 					}
 					if(!isPlanning){
@@ -197,7 +203,7 @@ public class JobExecThread implements Callable<Double>{
 						machine.downTime++;			
 					}
 				}
-				else if(current.getJobType() == Job.JOB_CM && machine.getStatus() == Macros.MACHINE_CM)
+				else if(current.getJobType() == Job.JOB_CM && getStatus() == Macros.MACHINE_CM)
 				{
 					current.setStatus(Job.STARTED);
 					if(!isPlanning)
@@ -212,7 +218,7 @@ public class JobExecThread implements Callable<Double>{
 
 				// decrement job time by unit time
 				try{
-					if(machine.getStatus()==Macros.MACHINE_RUNNING_JOB || machine.getStatus()==Macros.MACHINE_CM || machine.getStatus()==Macros.MACHINE_PM)
+					if(getStatus()==Macros.MACHINE_RUNNING_JOB || getStatus()==Macros.MACHINE_CM || getStatus()==Macros.MACHINE_PM)
 					{
 						jobList.decrement(1);
 					}
@@ -305,7 +311,7 @@ public class JobExecThread implements Callable<Double>{
 						}
 						// update Machine status on job completion
 						if(jobList.isEmpty())
-							machine.setStatus(Macros.MACHINE_IDLE);
+							setStatus(Macros.MACHINE_IDLE);
 
 					}
 					catch(IOException e){
@@ -325,20 +331,30 @@ public class JobExecThread implements Callable<Double>{
 		}
 		return cost/Macros.SIMULATION_COUNT;
 	}
-	private void employLabour(int[] labour) {
-		for(int i=0;i<labour.length;i++)
-			 Main.labour[i] -= labour[i];
+	private int getStatus() {
+		
+		return status;
+	}
+	private void setStatus(int machinePlanning) {
+		status = machinePlanning;
 		
 	}
-	private boolean checkLabour(int[] labour) {
-		for(int i=0;i<labour.length;i++)
-		 if(Main.labour[i] < labour[i])
+	private void employLabour(int[] labour2) {
+		for(int i=0;i<labour2.length;i++)
+			 labour[i] -= labour2[i];
+		
+	}
+	private boolean checkLabour(int[] labour2) {
+		for(int i=0;i<labour2.length;i++){
+		 
+			if(labour[i] < labour2[i])
 			 return false;
+		 }
 		return true;
 	}
-	private void freeLabour(int[] labour){
-		for(int i=0;i<labour.length;i++)
-			 Main.labour[i] += labour[i];
+	private void freeLabour(int[] labour2){
+		for(int i=0;i<labour2.length;i++)
+			 labour[i] += labour2[i];
 	}
 	private void timeSync() throws InterruptedException, BrokenBarrierException {
 		// TODO Auto-generated method stub
