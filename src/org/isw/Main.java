@@ -72,8 +72,8 @@ public class Main {
 				}
 			}
 			
-			MemeticAlgorithm ma = new MemeticAlgorithm(Macros.MA_POPULATION_SIZE,Macros.MA_GENERATIONS,mainSchedules,machines,false);
-			mainSchedules = ma.execute();
+			ParticleSwarm pso = new ParticleSwarm(Macros.MA_POPULATION_SIZE,Macros.MA_GENERATIONS,mainSchedules,machines);
+			mainSchedules = pso.execute();
 			planningTime = (System.nanoTime() - startTime)/Math.pow(10, 9);
 			for(int i=0;i<Macros.SIMULATION_COUNT;i++)
 				calculateCost(false);

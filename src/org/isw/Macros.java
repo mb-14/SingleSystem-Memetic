@@ -43,6 +43,7 @@ public class Macros {
 	public static int SIMULATION_COUNT = 1000;
 	public static int MA_POPULATION_SIZE = 100;
 	public static int MA_GENERATIONS = 100;
+	
 	public static void loadMacros(){	
 		try {
 			Properties prop = new Properties();
@@ -53,7 +54,9 @@ public class Macros {
 			SIMULATION_COUNT = Integer.parseInt(prop.getProperty("simulationCount"));
 			MA_POPULATION_SIZE = Integer.parseInt(prop.getProperty("populationSize"));
 			MA_GENERATIONS = Integer.parseInt(prop.getProperty("generations"));
-			
+			ParticleSwarm.Cg = Double.parseDouble(prop.getProperty("Cg"));
+			ParticleSwarm.Cp = Double.parseDouble(prop.getProperty("Cp"));
+			ParticleSwarm.W = Double.parseDouble(prop.getProperty("W"));
 		} catch (FileNotFoundException e) {
 			// TODO Auto-generated catch block
 			e.printStackTrace();

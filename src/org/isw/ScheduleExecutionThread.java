@@ -11,22 +11,24 @@ import java.util.concurrent.Executors;
 public class ScheduleExecutionThread implements Runnable{
 	ArrayList<Schedule> scheduleList;
 	ArrayList<Machine> machineList;
-	Chromosome chromosome;
-	public ScheduleExecutionThread(ArrayList<Schedule> scheduleList, ArrayList<Machine> machineList, Chromosome chromosome){
+	Particle particle;
+	public ScheduleExecutionThread(ArrayList<Schedule> scheduleList, ArrayList<Machine> machineList, Particle particle){
 		this.scheduleList = scheduleList;
-		this.chromosome = chromosome;
+		this.particle = particle;
 		this.machineList = machineList;
 	}
 	
 
 	@Override
-	public void run() {
+	public void run() 
+	{
 		ExecutorService threadPool = Executors.newFixedThreadPool(machineList.size());
 		CompletionService<Double> pool = new ExecutorCompletionService<Double>(threadPool);
 		CyclicBarrier sync = new CyclicBarrier(machineList.size());
 		Object lock = new Object();
 		int[] labour = new int[]{2,4,8};
-		for(int i=0;i<machineList.size();i++){
+		for(int i=0;i<machineList.size();i++)
+		{
 			pool.submit(new JobExecThread(scheduleList.get(i),machineList.get(i),true,sync,lock,labour));
 		}
 		Double cost = 0d;
@@ -40,8 +42,10 @@ public class ScheduleExecutionThread implements Runnable{
 		}
 		threadPool.shutdown();
 		while(!threadPool.isTerminated());
-		chromosome.fitnessValue = cost;
-		MemeticAlgorithm.fitnessCache.put(MemeticAlgorithm.stringRep(chromosome.combo), cost);
+		particle.cost = cost;
+		ParticleSwarm.fitnessCache.put(ParticleSwarm.stringRep(particle.x), cost);
+		
+		particle.updateBest();
 	}
 
 }

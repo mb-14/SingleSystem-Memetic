@@ -1,27 +1,55 @@
 package org.isw;
 
-import java.util.Random;
+public class Particle implements Comparable<Particle>{
 
-public class Chromosome implements Comparable<Chromosome>{
-	static Random rand = new Random();
-	double pmAvgTime;
-	double fitnessValue;
-	//Binary representation of the chromosome
-	long[] combo;
-	public Chromosome(long[] combo){
-		this.combo = combo;
-		this.fitnessValue = 0;
+	public long[] x;
+	public long[] v;
+	public long[] bestX;
+	public double cost;
+	public double bestCost;
+
+	public long[] upper;
+	
+	public Particle()
+	{
+	}
+	
+	public Particle(long[] x, long[] upper){
+		this.x = x;
+		this.upper = upper;
+		this.bestX = this.x;
+		this.bestCost = -1;
+		v = new long[x.length];
+		
+		for(int i=0; i<this.upper.length; i++)
+			v[i] = Math.round(this.upper[i]*Math.pow(-1,i)/2);
+	}
+	
+	public void updateBest()
+	{
+		//update particle best
+		
+		if(bestCost == -1 || cost < bestCost)
+		{
+			bestCost = cost;
+			bestX = x;
+		}
+	}
+	
+	public String toString()
+	{
+		return String.format("%f %d %d %d\n", bestCost, bestX[0], bestX[1], bestX[2]);
 	}
 
 	public long[] getCombolist(int j) {
-		long combos[] = new long[MemeticAlgorithm.pmOs.get(j).size()];
-		for(int i =0;i<MemeticAlgorithm.pmOs.get(j).size();i++){
-			combos[i] = (combo[j]>>(MemeticAlgorithm.machines.get(j).compList.length*i))&((int)Math.pow(2,MemeticAlgorithm.machines.get(j).compList.length)-1);
+		long combos[] = new long[ParticleSwarm.pmOs.get(j).size()];
+		for(int i =0;i<ParticleSwarm.pmOs.get(j).size();i++){
+			combos[i] = (x[j]>>(ParticleSwarm.machines.get(j).compList.length*i))&((int)Math.pow(2,ParticleSwarm.machines.get(j).compList.length)-1);
 		}
 		return combos;
 	}
 
-	public void applyLocalSearch() {
+	/*public void applyLocalSearch() {
 		for(int j = 0;j < combo.length; j++)
 			applyLocalSearch(j);
 		
@@ -99,10 +127,10 @@ public class Chromosome implements Comparable<Chromosome>{
 			combos[i] = (combo>>(MemeticAlgorithm.machines.get(j).compList.length*i))&((int)Math.pow(2,MemeticAlgorithm.machines.get(j).compList.length)-1);
 		}
 		return combos;
-	}
+	}*/
 
 	@Override
-	public int compareTo(Chromosome o) {
-		return Double.compare(fitnessValue, o.fitnessValue);
+	public int compareTo(Particle o) {
+		return Double.compare(cost, o.cost);
 	}
 }
