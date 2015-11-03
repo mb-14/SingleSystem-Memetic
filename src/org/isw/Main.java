@@ -32,6 +32,7 @@ public class Main {
 	static LabourAvailability pmLabourAssignment;
 	static Double minCost;
 	static double planningTime;
+	public static int[] labour;
 	public static void main(String args[]) throws InterruptedException, ExecutionException, NumberFormatException, IOException
 	{
 		Macros.loadMacros();
@@ -66,12 +67,12 @@ public class Main {
 			int count =0;
 			for(int j=0;j<noOfMachines;j++){
 				Schedule sched = mainSchedules.get(j);
-				for(int i=0;i<3;i++){
+				for(int i=0;i<7;i++){
 					sched.addJob(jobArray.get(count++));		
 				}
 			}
 			
-			MemeticAlgorithm ma = new MemeticAlgorithm(100,100,mainSchedules,machines,false);
+			MemeticAlgorithm ma = new MemeticAlgorithm(Macros.MA_POPULATION_SIZE,Macros.MA_GENERATIONS,mainSchedules,machines,false);
 			mainSchedules = ma.execute();
 			planningTime = (System.nanoTime() - startTime)/Math.pow(10, 9);
 			for(int i=0;i<Macros.SIMULATION_COUNT;i++)
@@ -87,7 +88,7 @@ public class Main {
 		ExecutorService threadPool = Executors.newFixedThreadPool(noOfMachines);
 		CompletionService<Double> pool = new ExecutorCompletionService<Double>(threadPool);
 		CyclicBarrier sync = new CyclicBarrier(noOfMachines);
-		int[] labour = new int[]{2,4,8};
+		labour = new int[]{2,4,8};
 		Object lock = new Object();
 		for(int i=0;i<noOfMachines;i++){
 			pool.submit(new JobExecThread(mainSchedules.get(i),machines.get(i),isPlanning,sync,lock,labour));
@@ -204,15 +205,16 @@ public class Main {
 		jobArray = new ArrayList<Job>();
 		try
 		{
-			FileInputStream file = new FileInputStream(new File("Jobs_3.xlsx"));
+			FileInputStream file = new FileInputStream(new File("Jobs.xlsx"));
 			XSSFWorkbook workbook = new XSSFWorkbook(file);
 			XSSFSheet sheet = workbook.getSheetAt(0);
 			
-			for(int i=1;i<= noOfMachines*3;i++)
+			for(int i=1;i<= noOfMachines*7;i++)
 			{
 				Row row = sheet.getRow(i);
 				String jobName = row.getCell(0).getStringCellValue();
 				long jobTime = (long)(row.getCell(1).getNumericCellValue()*Macros.TIME_SCALE_FACTOR);
+				//long jobTime = 206;
 				double jobCost = row.getCell(3).getNumericCellValue();	
 				Job job = new Job(jobName,jobTime,jobCost,Job.JOB_NORMAL);
 				job.setPenaltyCost(row.getCell(4).getNumericCellValue());

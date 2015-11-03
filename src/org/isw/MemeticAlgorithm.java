@@ -21,7 +21,7 @@ public class MemeticAlgorithm {
 	static Hashtable<String, Double>  fitnessCache;
 	private int populationSize;
 	private int stopCrit;
-	Chromosome best;
+	Double best;
 	private ArrayList<Chromosome> population;
 	private ArrayList<Chromosome> offsprings;
 	private double totalFitness;
@@ -36,6 +36,7 @@ public class MemeticAlgorithm {
 		schedule = scheduleList;
 		machines = machineList;
 		rand = new Random();
+		best = 0d;
 		convergenceCount = 0;
 		pmOs = new ArrayList<ArrayList<Integer>>();
 		this.noLS = noLS;
@@ -75,14 +76,14 @@ public class MemeticAlgorithm {
 
 
 	private boolean hasConverged() {
-		if(population.get(0).combo == best.combo){
+		if(population.get(0).fitnessValue == best){
 			convergenceCount++;
 			if(convergenceCount == 25)
 				return true;
 		}
 		else{
 			convergenceCount = 0;
-			best.combo =  population.get(0).combo;
+			best =  population.get(0).fitnessValue;
 		}
 		return false;
 	}

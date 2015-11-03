@@ -24,7 +24,9 @@ public class JobExecThread implements Callable<Double>{
 		this.sync = sync;
 		this.lock = lock;
 		this.labour = labour;
+
 	}
+	
 	public Double call() throws InterruptedException, BrokenBarrierException{
 		int count = 1;
 		Double cost = 0d;
@@ -34,6 +36,7 @@ public class JobExecThread implements Callable<Double>{
 			labour[0] = 2;
 			labour[1] = 4;
 			labour[2] = 8;
+			timeSync();
 			long time = 0;
 			Component[] compList;
 			Schedule jobList;

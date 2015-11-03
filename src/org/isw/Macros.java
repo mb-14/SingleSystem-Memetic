@@ -41,6 +41,8 @@ public class Macros {
 	public static int TIME_SCALE_FACTOR = 1;
 	public static int SHIFT_DURATION = 8;
 	public static int SIMULATION_COUNT = 1000;
+	public static int MA_POPULATION_SIZE = 100;
+	public static int MA_GENERATIONS = 100;
 	public static void loadMacros(){	
 		try {
 			Properties prop = new Properties();
@@ -49,6 +51,9 @@ public class Macros {
 			TIME_SCALE_FACTOR = Integer.parseInt(prop.getProperty("scaleFactor"));
 			SHIFT_DURATION = Integer.parseInt(prop.getProperty("shiftDuration"));
 			SIMULATION_COUNT = Integer.parseInt(prop.getProperty("simulationCount"));
+			MA_POPULATION_SIZE = Integer.parseInt(prop.getProperty("populationSize"));
+			MA_GENERATIONS = Integer.parseInt(prop.getProperty("generations"));
+			
 		} catch (FileNotFoundException e) {
 			// TODO Auto-generated catch block
 			e.printStackTrace();
