@@ -23,11 +23,10 @@ import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 
 public class Main {
 	public static ArrayList<Schedule> mainSchedules = new ArrayList<Schedule>();
-	public static ArrayList<Schedule> minSchedules = new ArrayList<Schedule>();
 	static ArrayList<ArrayList<SimulationResult>> table;
 	static Random r = new Random(); 
-	static ArrayList<Job> jobArray;
-	static ArrayList<Machine> machines = new ArrayList<Machine>();
+	public static ArrayList<Job> jobArray;
+	public static ArrayList<Machine> machines = new ArrayList<Machine>();
 	static int noOfMachines =0;
 	static LabourAvailability pmLabourAssignment;
 	static Double minCost;
@@ -51,7 +50,6 @@ public class Main {
 			}
 			machines.add(new Machine(i,compIndex));
 			mainSchedules.add(new Schedule());
-			minSchedules.add(mainSchedules.get(i));
 		}
 		in.close();
 		parseJobs();
@@ -86,7 +84,7 @@ public class Main {
 	
 	private static void calculateCost(boolean isPlanning) throws InterruptedException, ExecutionException {
 		ExecutorService threadPool = Executors.newFixedThreadPool(noOfMachines);
-		CompletionService<Double> pool = new ExecutorCompletionService<Double>(threadPool);
+		CompletionService<Double[]> pool = new ExecutorCompletionService<Double[]>(threadPool);
 		CyclicBarrier sync = new CyclicBarrier(noOfMachines);
 		labour = new int[]{2,4,8};
 		Object lock = new Object();
@@ -96,17 +94,12 @@ public class Main {
 		Double cost = 0d;
 
 		for(int i=0;i<noOfMachines;i++){
-			cost += pool.take().get();
+			//FIX
+			cost += pool.take().get()[0];
 		}
 		threadPool.shutdown();
 		while(!threadPool.isTerminated());
-		if(isPlanning){
-			if(cost < minCost){
-				minCost = cost;
-				for(int j=0;j<noOfMachines;j++)
-					minSchedules.set(j,new Schedule(mainSchedules.get(j)));
-			}
-		}
+		
 	}
 	
 	static void assignLabour(SimulationResult row, LabourAvailability pmLabour){
@@ -200,7 +193,7 @@ public class Main {
 			}
 		}
 	}
-	private static void parseJobs() 
+	public static void parseJobs() 
 	{
 		jobArray = new ArrayList<Job>();
 		try

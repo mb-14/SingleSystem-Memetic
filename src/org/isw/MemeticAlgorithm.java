@@ -67,6 +67,8 @@ public class MemeticAlgorithm {
 		}
 
 		Collections.sort(population);
+		
+	
 		for(int j=0;j<machines.size();j++){
 			addPMJobs(schedule.get(j),machines.get(j).compList,j, population.get(0).getCombolist(j));
 		}

@@ -92,7 +92,7 @@ public class Chromosome implements Comparable<Chromosome>{
 		return failureCount/50d;
 	}
 
-	private long[] getCombolist(long combo, int j) {
+	public static long[] getCombolist(long combo, int j) {
 		//J is machineIndex
 		long combos[] = new long[MemeticAlgorithm.pmOs.get(j).size()];
 		for(int i =0;i< MemeticAlgorithm.pmOs.get(j).size();i++){

@@ -9,7 +9,7 @@ import java.util.concurrent.Callable;
 import java.util.concurrent.CyclicBarrier;
 
 
-public class JobExecThread implements Callable<Double>{
+public class JobExecThread implements Callable<Double[]>{
 	Schedule schedule;
 	Machine machine;
 	boolean isPlanning;
@@ -27,9 +27,12 @@ public class JobExecThread implements Callable<Double>{
 
 	}
 	
-	public Double call() throws InterruptedException, BrokenBarrierException{
+	public Double[] call() throws InterruptedException, BrokenBarrierException{
 		int count = 1;
-		Double cost = 0d;
+		Double pmCost = 0d;
+		Double cmCost = 0d;
+		Double penaltyCost =0d;
+		Double processingCost = 0d;
 		if(isPlanning)
 			count = Macros.SIMULATION_COUNT;
 		while(count-- > 0){
@@ -80,7 +83,7 @@ public class JobExecThread implements Callable<Double>{
 							if(!isPlanning)
 								machine.penaltyCost += jobList.jobAt(i++).getPenaltyCost()*jobList.jobAt(i-1).getJobTime();
 							else
-								cost += jobList.jobAt(i++).getPenaltyCost()*jobList.jobAt(i-1).getJobTime();
+								penaltyCost += jobList.jobAt(i++).getPenaltyCost()*jobList.jobAt(i-1).getJobTime();
 						}
 					}
 					break;
@@ -164,7 +167,7 @@ public class JobExecThread implements Callable<Double>{
 					// no failure, no maintenance. Just increment cost models normally.
 					if(!isPlanning)
 						machine.procCost += current.getJobCost()/Macros.TIME_SCALE_FACTOR;
-					//cost += current.getJobCost()/Macros.TIME_SCALE_FACTOR;
+					processingCost += current.getJobCost()/Macros.TIME_SCALE_FACTOR;
 					for(Component comp : compList)
 						comp.initAge++;
 					if(!isPlanning)
@@ -199,7 +202,7 @@ public class JobExecThread implements Callable<Double>{
 						current.setStatus(Job.STARTED);
 					if(!isPlanning)
 						machine.pmCost += current.getFixedCost() + current.getJobCost()/Macros.TIME_SCALE_FACTOR;
-					cost += current.getFixedCost() + current.getJobCost()/Macros.TIME_SCALE_FACTOR;
+					pmCost += current.getFixedCost() + current.getJobCost()/Macros.TIME_SCALE_FACTOR;
 					current.setFixedCost(0);
 					if(!isPlanning){
 						machine.pmDownTime++;
@@ -211,7 +214,7 @@ public class JobExecThread implements Callable<Double>{
 					current.setStatus(Job.STARTED);
 					if(!isPlanning)
 						machine.cmCost += current.getFixedCost() + current.getJobCost()/Macros.TIME_SCALE_FACTOR;
-					cost += current.getFixedCost() + current.getJobCost()/Macros.TIME_SCALE_FACTOR;
+					cmCost += current.getFixedCost() + current.getJobCost()/Macros.TIME_SCALE_FACTOR;
 					current.setFixedCost(0);
 					if(!isPlanning){
 						machine.downTime++;
@@ -332,7 +335,11 @@ public class JobExecThread implements Callable<Double>{
 			compList = null;
 			//System.gc();
 		}
-		return cost/Macros.SIMULATION_COUNT;
+		pmCost /= Macros.SIMULATION_COUNT;
+		cmCost /= Macros.SIMULATION_COUNT;
+		penaltyCost /= Macros.SIMULATION_COUNT;
+		processingCost /= Macros.SIMULATION_COUNT;
+		return new Double[]{pmCost,cmCost,penaltyCost,processingCost};
 	}
 	private int getStatus() {
 		
