@@ -14,7 +14,8 @@ public class Particle implements Comparable<Particle>{
 	{
 	}
 	
-	public Particle(long[] x, long[] upper){
+	public Particle(long[] x, long[] upper)
+	{
 		this.x = x;
 		this.upper = upper;
 		this.bestX = this.x;

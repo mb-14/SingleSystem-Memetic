@@ -57,6 +57,7 @@ public class Macros {
 			ParticleSwarm.Cg = Double.parseDouble(prop.getProperty("Cg"));
 			ParticleSwarm.Cp = Double.parseDouble(prop.getProperty("Cp"));
 			ParticleSwarm.W = Double.parseDouble(prop.getProperty("W"));
+			ParticleSwarm.factor = Integer.parseInt(prop.getProperty("factor"));
 		} catch (FileNotFoundException e) {
 			// TODO Auto-generated catch block
 			e.printStackTrace();

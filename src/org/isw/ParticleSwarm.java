@@ -21,6 +21,7 @@ public class ParticleSwarm {
 
 	Particle globalBest;
 	static double W, Cp, Cg;
+	public static long factor;
 
 	public ParticleSwarm(int populationSize, int stopCrit, ArrayList<Schedule> scheduleList , ArrayList<Machine>machineList){
 		this.populationSize = populationSize;
@@ -51,45 +52,51 @@ public class ParticleSwarm {
 			// move particles
 			for(Particle particle: population)
 			{
+				if(particle.x == globalBest.x)
+				{
+					for(int i=0; i<particle.x.length; i++)
+					{
+						particle.x[i] += Math.round(Math.random()*particle.upper[i]);
+						particle.v[i] = Math.round(particle.upper[i]/2);
+					}
+				}
+				
 				for(int dim=0; dim<particle.x.length; dim++)
 				{
 					//60 6 3 1 2 3 3 1 2 5 3 5 6 7 3 13 14 15 3 17 18 19 3 17 18 20
-					while(true)
+					//60 8 3 1 2 3 3 1 2 5 3 5 6 7 3 8 9 10 3 9 10 11 3 13 14 15 3 17 18 19 3 9 17 21
+
+					// accelerate stationary particle
+					if(particle.v[dim] == 0)
+						particle.v[dim] = 1+particle.upper[dim]/10000;
+
+					//accelerate particle
+					particle.v[dim] = Math.round(W*particle.v[dim] 
+							+ Math.random()*Cp*(particle.bestX[dim]-particle.x[dim]) 
+							+ Math.random()*Cg*(globalBest.x[dim]-particle.x[dim]));
+
+					//limit velocity to upper bound
+					if(particle.v[dim] > particle.upper[dim])
 					{
-						particle.v[dim] = Math.round(W*particle.v[dim] + Math.random()*Cp*(particle.bestX[dim]-particle.x[dim]) + Math.random()*Cg*(globalBest.x[dim]-particle.x[dim]));
-						particle.x[dim] += particle.v[dim];
-						if(particle.x[dim]<0 || particle.x[dim]>particle.upper[dim])
-						{
-							particle.x[dim] = Math.round(Math.random()* particle.upper[dim]);
-							particle.v[dim] = Math.round(particle.v[dim]*-1);
-						}
-						else
-							break;
-					}
-				}
-				/*
-					if(particle.x[dim]<0)
-					{
-						particle.x[dim] = 0;
-						particle.v[dim] = Math.round(particle.v[dim]*-1);
-					}
-					if(particle.x[dim]>particle.upper[dim])
-					{
-						particle.x[dim] = particle.upper[dim];
-						particle.v[dim] = Math.round(particle.v[dim]*-1);
+						particle.v[dim] = Math.round(particle.upper[dim]/2);
 					}
 
-					if(particle.v[dim]==0)
+					// update particle x
+					particle.x[dim] += particle.v[dim];
+
+					
+					//keep particle within bounds
+					if(particle.x[dim]<0 || particle.x[dim]>particle.upper[dim])
 					{
-						particle.v[dim] += particle.upper[dim]/5;
+						particle.x[dim] = Math.round(Math.random()* particle.upper[dim]);
+						particle.v[dim] = Math.round(particle.v[dim]*-1);
 					}
-				 */
+				}
 			}
 
 			evaluateFitness(population);
 			System.out.format("Gen: %d, Best: %f\n", generation, globalBest.cost);
 		}
-
 		for(int j=0;j<machines.size();j++)
 		{
 			addPMJobs(schedule.get(j),machines.get(j).compList,j, globalBest.getCombolist(j));
@@ -112,13 +119,37 @@ public class ParticleSwarm {
 			}
 			else
 			{
-				ArrayList<Schedule> tempSchedules = new ArrayList<Schedule>();
-				for(int j=0;j<machines.size();j++)
+
+				boolean invalid = false;
+				for(int dim=0; dim<particle.x.length; dim++)
 				{
-					tempSchedules.add(new Schedule(schedule.get(j)));
-					addPMJobs(tempSchedules.get(j),machines.get(j).compList,j, particle.getCombolist(j));
+					if(particle.x[dim] > particle.upper[dim] || particle.x[dim]<0)
+					{
+						invalid = true;
+						break;
+					}
 				}
-				threadPool.execute(new ScheduleExecutionThread(tempSchedules,machines,particle));
+				if(invalid)
+				{
+					System.out.println("Invalid value");
+					particle.cost = Double.MAX_VALUE;
+					ParticleSwarm.fitnessCache.put(ParticleSwarm.stringRep(particle.x), Double.MAX_VALUE);
+					for(int dim =0; dim<particle.x.length; dim++)
+						if(particle.x[dim]>particle.upper[dim] || particle.x[dim]<0)
+							particle.v[dim] *= -1;
+					particle.updateBest();
+				}
+				else
+				{
+
+					ArrayList<Schedule> tempSchedules = new ArrayList<Schedule>();
+					for(int j=0;j<machines.size();j++)
+					{
+						tempSchedules.add(new Schedule(schedule.get(j)));
+						addPMJobs(tempSchedules.get(j),machines.get(j).compList,j, particle.getCombolist(j));
+					}
+					threadPool.execute(new ScheduleExecutionThread(tempSchedules,machines,particle));
+				}
 			}
 
 		}
