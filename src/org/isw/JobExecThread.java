@@ -34,7 +34,7 @@ public class JobExecThread implements Callable<Double[]>{
 		Double penaltyCost =0d;
 		Double processingCost = 0d;
 		if(isPlanning)
-			count = Macros.SIMULATION_COUNT;
+			count = 100;
 		while(count-- > 0){
 			labour[0] = 2;
 			labour[1] = 4;

@@ -34,6 +34,9 @@ public class Main {
 	public static int[] labour;
 	public static void main(String args[]) throws InterruptedException, ExecutionException, NumberFormatException, IOException
 	{
+		if(args.length > 0){
+		  Macros.NO_OF_JOBS = Integer.parseInt(args[0]);
+		}
 		Macros.loadMacros();
 		System.out.println("Enter number of days to simulate:");
 		Scanner in = new Scanner(System.in);
@@ -65,7 +68,7 @@ public class Main {
 			int count =0;
 			for(int j=0;j<noOfMachines;j++){
 				Schedule sched = mainSchedules.get(j);
-				for(int i=0;i<7;i++){
+				for(int i=0;i<Macros.NO_OF_JOBS;i++){
 					sched.addJob(jobArray.get(count++));		
 				}
 			}
@@ -198,11 +201,15 @@ public class Main {
 		jobArray = new ArrayList<Job>();
 		try
 		{
-			FileInputStream file = new FileInputStream(new File("Jobs.xlsx"));
+			FileInputStream file;
+			if(Macros.NO_OF_JOBS == 7)
+				file  = new FileInputStream(new File("Jobs.xlsx"));
+			else
+				file  = new FileInputStream(new File("Jobs_3.xlsx"));
 			XSSFWorkbook workbook = new XSSFWorkbook(file);
 			XSSFSheet sheet = workbook.getSheetAt(0);
 			
-			for(int i=1;i<= noOfMachines*7;i++)
+			for(int i=1;i<= noOfMachines*Macros.NO_OF_JOBS;i++)
 			{
 				Row row = sheet.getRow(i);
 				String jobName = row.getCell(0).getStringCellValue();

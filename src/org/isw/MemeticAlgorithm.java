@@ -1,6 +1,9 @@
 package org.isw;
 
+import java.io.BufferedWriter;
+import java.io.FileWriter;
 import java.io.IOException;
+import java.io.PrintWriter;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Hashtable;
@@ -71,7 +74,24 @@ public class MemeticAlgorithm {
 	
 		for(int j=0;j<machines.size();j++){
 			addPMJobs(schedule.get(j),machines.get(j).compList,j, population.get(0).getCombolist(j));
+			long[] chromosome = population.get(0).getCombolist(j);
+			String str = schedule.get(j).printSchedule();
+			try(PrintWriter out = new PrintWriter(new BufferedWriter(new FileWriter("final_schedule_"+schedule.size(),true)))){ 
+				out.print("Combo:" );
+				for(int k=0;k<machines.get(j).compList.length;k++)
+					out.format("%s,",machines.get(j).compList[k].compName);
+				for(int k=0;k<chromosome.length;k++)
+					out.print(String.format("%3s |", Long.toBinaryString(chromosome[k]).replace(" ","0")));
+				out.println();	
+				out.println(str);
+				out.println();
+				out.println();
+			} catch (IOException e) {
+				// TODO Auto-generated catch block
+				e.printStackTrace();
+			}
 		}
+		
 		return schedule;
 	}
 

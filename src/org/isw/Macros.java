@@ -43,6 +43,7 @@ public class Macros {
 	public static int SIMULATION_COUNT = 1000;
 	public static int MA_POPULATION_SIZE = 100;
 	public static int MA_GENERATIONS = 100;
+	public static int NO_OF_JOBS = 7;
 	public static void loadMacros(){	
 		try {
 			Properties prop = new Properties();

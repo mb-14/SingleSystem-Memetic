@@ -50,9 +50,9 @@ public class ScheduleExecutionThread implements Runnable{
 		}
 		threadPool.shutdown();
 		while(!threadPool.isTerminated());
-		//chromosome.fitnessValue = cost;
-		System.out.format("%f,%f,%f,,%f\n", arr[0],arr[1],arr[2],arr[3]);
-		//MemeticAlgorithm.fitnessCache.put(MemeticAlgorithm.stringRep(chromosome.combo), cost);
+		chromosome.fitnessValue = cost;
+		//System.out.format("%f,%f,%f,,%f\n", arr[0],arr[1],arr[2],arr[3]);
+		MemeticAlgorithm.fitnessCache.put(MemeticAlgorithm.stringRep(chromosome.combo), cost);
 	}
 
 }
