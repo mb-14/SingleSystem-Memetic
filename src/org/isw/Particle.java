@@ -10,20 +10,34 @@ public class Particle implements Comparable<Particle>{
 
 	public long[] upper;
 	
-	public Particle()
+	public Particle(int size)
 	{
+		x = new long[size];
+		v = new long[size];
+		bestX = new long[size];
+		
 	}
 	
 	public Particle(long[] x, long[] upper)
 	{
 		this.x = x;
 		this.upper = upper;
-		this.bestX = this.x;
+		this.bestX = new long[x.length];
+		arrayCopy(this.bestX, this.x);
 		this.bestCost = -1;
 		v = new long[x.length];
 		
 		for(int i=0; i<this.upper.length; i++)
-			v[i] = Math.round(this.upper[i]*Math.pow(-1,i)/2);
+			//v[i] = Math.round(this.upper[i]*Math.pow(-1,i)/2);
+			v[i] = 0;
+	}
+	
+	public static void arrayCopy(long dest[], long source[])
+	{
+		for(int i=0; i<source.length; i++)
+		{
+			dest[i] = source[i];
+		}
 	}
 	
 	public void updateBest()
@@ -33,7 +47,7 @@ public class Particle implements Comparable<Particle>{
 		if(bestCost == -1 || cost < bestCost)
 		{
 			bestCost = cost;
-			bestX = x;
+			arrayCopy(bestX,x);
 		}
 	}
 	

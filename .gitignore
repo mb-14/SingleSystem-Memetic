@@ -2,4 +2,6 @@
 .recommenders/
 *.class
 bin/
-
+.project
+results.csv
+final_schedule_*
