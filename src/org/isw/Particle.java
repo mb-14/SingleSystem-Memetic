@@ -58,7 +58,8 @@ public class Particle implements Comparable<Particle>{
 
 	public long[] getCombolist(int j) {
 		long combos[] = new long[ParticleSwarm.pmOs.get(j).size()];
-		for(int i =0;i<ParticleSwarm.pmOs.get(j).size();i++){
+		int size = ParticleSwarm.pmOs.get(j).size();
+		for(int i=0;i<size;i++){
 			combos[i] = (x[j]>>(ParticleSwarm.machines.get(j).compList.length*i))&((int)Math.pow(2,ParticleSwarm.machines.get(j).compList.length)-1);
 		}
 		return combos;

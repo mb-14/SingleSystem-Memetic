@@ -27,6 +27,13 @@ public class JobExecThread implements Callable<Double>{
 
 	}
 	
+	public static void printLog(String s)
+	{
+		boolean log = false;
+		if(log)
+			System.out.println(s);
+	}
+	
 	public Double call() throws InterruptedException, BrokenBarrierException{
 		int count = 1;
 		Double cost = 0d;
@@ -87,8 +94,8 @@ public class JobExecThread implements Callable<Double>{
 				}
 
 				if(jobList.isEmpty()){
-					System.out.println(time);
-					System.out.println(schedule.printSchedule());
+					printLog(String.valueOf(time));
+					printLog(schedule.printSchedule());
 					System.exit(0);
 					timeSync();
 					time++;
@@ -110,7 +117,7 @@ public class JobExecThread implements Callable<Double>{
 					 * Add CM job to top of schedule and run it. 
 					 */
 					if(!isPlanning){
-						System.out.println("Machine Failed. Requesting maintenance...");
+						printLog("Machine Failed. Requesting maintenance...");
 					}
 					Job cmJob = new Job("CM", upcomingFailure.repairTime, machine.compList[upcomingFailure.compNo].getCMLabourCost(), Job.JOB_CM);
 					cmJob.setFixedCost(machine.compList[upcomingFailure.compNo].getCMFixedCost());
@@ -143,7 +150,7 @@ public class JobExecThread implements Callable<Double>{
 					else 
 					{
 						if(!isPlanning){
-							System.out.println("Request denied. Not enough labour " + time);
+							printLog("Request denied. Not enough labour " + String.valueOf(time));
 							//Logger.log(Machine.getStatus(),"Request denied. Not enough labour");
 						}
 						// machine waits for labour
@@ -180,7 +187,7 @@ public class JobExecThread implements Callable<Double>{
 						continue;
 					}
 					if(!isPlanning){
-						System.out.println(current.getJobTime());
+						printLog(String.valueOf(current.getJobTime()));
 					}
 					// since an actual PM job is a series of PM jobs of each comp in compCombo
 					// we set all jobs in series to SERIES_STARED
@@ -310,7 +317,7 @@ public class JobExecThread implements Callable<Double>{
 						Job job = jobList.remove();
 						// job is complete, remove from joblist
 						if(!isPlanning){
-							System.out.println("Machine "+machine.machineNo+": Job "+ job.getJobName()+" complete");
+							printLog("Machine "+machine.machineNo+": Job "+ job.getJobName()+" complete");
 						}
 						// update Machine status on job completion
 						if(jobList.isEmpty())

@@ -52,23 +52,23 @@ public class ParticleSwarm {
 			// move particles
 			for(Particle particle: population)
 			{
-//				if(particle.x == globalBest.x)
-//				{
-//					for(int i=0; i<particle.x.length; i++)
-//					{
-//						particle.x[i] += Math.round(Math.random()*particle.upper[i]);
-//						//particle.v[i] = Math.round(particle.upper[i]/2);
-//					}
-//				}
-				
+				//				if(particle.x == globalBest.x)
+				//				{
+				//					for(int i=0; i<particle.x.length; i++)
+				//					{
+				//						particle.x[i] += Math.round(Math.random()*particle.upper[i]);
+				//						//particle.v[i] = Math.round(particle.upper[i]/2);
+				//					}
+				//				}
+
 				for(int dim=0; dim<particle.x.length; dim++)
 				{
 					//60 6 3 1 2 3 3 1 2 5 3 5 6 7 3 13 14 15 3 17 18 19 3 17 18 20
 					//60 8 3 1 2 3 3 1 2 5 3 5 6 7 3 8 9 10 3 9 10 11 3 13 14 15 3 17 18 19 3 9 17 21
 
 					// accelerate stationary particle
-//					if(particle.v[dim] == 0)
-//						particle.v[dim] = 1+particle.upper[dim]/100;
+					//					if(particle.v[dim] == 0)
+					//						particle.v[dim] = 1+particle.upper[dim]/100;
 
 					//accelerate particle
 					particle.v[dim] = 1+Math.round(W*particle.v[dim] 
@@ -84,7 +84,7 @@ public class ParticleSwarm {
 					// update particle x
 					particle.x[dim] += particle.v[dim];
 
-					
+
 					//keep particle within bounds
 					if(particle.x[dim]<0 || particle.x[dim]>particle.upper[dim])
 					{
@@ -98,12 +98,15 @@ public class ParticleSwarm {
 			for(Particle p: population)
 				System.out.format("(%d,%d)",p.x[0],p.v[0]);
 			System.out.format("\nGen: %d, Best: %f\n", generation, globalBest.cost);
+			for(int i1=0;i1<globalBest.x.length; i1++)
+				System.out.print(globalBest.x[i1]+" ");
+			System.out.println("\n");
 		}
 		for(int j=0;j<machines.size();j++)
 		{
 			addPMJobs(schedule.get(j),machines.get(j).compList,j, globalBest.getCombolist(j));
 		}
-		
+
 		try(PrintWriter out = new PrintWriter(new BufferedWriter(new FileWriter("result_schedule.csv",true))))
 		{ 
 			for(int i=0; i<globalBest.x.length; i++)
@@ -146,9 +149,9 @@ public class ParticleSwarm {
 					//System.out.println("Invalid value");
 					particle.cost = Double.MAX_VALUE;
 					ParticleSwarm.fitnessCache.put(ParticleSwarm.stringRep(particle.x), Double.MAX_VALUE);
-//					for(int dim =0; dim<particle.x.length; dim++)
-//						if(particle.x[dim]>particle.upper[dim] || particle.x[dim]<0)
-//							particle.v[dim] *= -1;
+					//					for(int dim =0; dim<particle.x.length; dim++)
+					//						if(particle.x[dim]>particle.upper[dim] || particle.x[dim]<0)
+					//							particle.v[dim] *= -1;
 					particle.updateBest();
 				}
 				else
@@ -219,7 +222,7 @@ public class ParticleSwarm {
 		}
 		return str;
 	}
-	
+
 	private void initializeParticles() throws NumberFormatException, IOException 
 	{
 		System.out.println("Initialize particles");
@@ -230,30 +233,22 @@ public class ParticleSwarm {
 			pmOs.add(schedule.get(i).getPMOpportunities());
 			upper[i] =(long) Math.pow(2, machines.get(i).compList.length*pmOs.get(i).size())-1;
 		}
-		
-		Hashtable<String, Boolean> hashTable = new Hashtable<String, Boolean>();
-		
+
 		globalBest = new Particle(machines.size());
 		globalBest.cost = -1;
 		for(int j = 0; j < machines.size();j++)
 		{	
 			num[j] = 100;
-			globalBest.x[j] = 0;
+			globalBest.x[j] = (long)(Math.random()*upper[j]*0.0001);
 		}
 		population.add(new Particle(num, upper));
-		hashTable.put(stringRep(num), new Boolean(true));
-		
+
 		for(int i=0;i<populationSize;i++)
 		{
 			num = new long[machines.size()];
 			for(int j = 0; j < machines.size();j++)
-				num[j] = 0;
-//			do{
-//				for(int j = 0; j < machines.size();j++)
-//					num[j] = (long)(Math.random()*upper[j]);
-//			}while(hashTable.containsKey(stringRep(num)));
+				num[j] = (long)(Math.random()*upper[j]*0.00001);
 			population.add(new Particle(num, upper));
-			//hashTable.put(stringRep(num), new Boolean(true));
 		}	
 	}
 }
