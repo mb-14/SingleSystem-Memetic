@@ -34,9 +34,7 @@ public class Main {
 	public static int[] labour;
 	public static void main(String args[]) throws InterruptedException, ExecutionException, NumberFormatException, IOException
 	{
-		if(args.length > 0){
-		  Macros.NO_OF_JOBS = Integer.parseInt(args[0]);
-		}
+		System.out.println("NOTE: Simulation parameters (Labour, No. of Jobs, Shift Duration, etc) are set in config.properties file.");
 		Macros.loadMacros();
 		System.out.println("Enter number of days to simulate:");
 		Scanner in = new Scanner(System.in);
@@ -89,7 +87,7 @@ public class Main {
 		ExecutorService threadPool = Executors.newFixedThreadPool(noOfMachines);
 		CompletionService<Double[]> pool = new ExecutorCompletionService<Double[]>(threadPool);
 		CyclicBarrier sync = new CyclicBarrier(noOfMachines);
-		labour = new int[]{2,4,8};
+		labour = new int[]{Macros.MAX_LABOUR[0],Macros.MAX_LABOUR[1],Macros.MAX_LABOUR[2]};
 		Object lock = new Object();
 		for(int i=0;i<noOfMachines;i++){
 			pool.submit(new JobExecThread(mainSchedules.get(i),machines.get(i),isPlanning,sync,lock,labour));
@@ -202,10 +200,10 @@ public class Main {
 		try
 		{
 			FileInputStream file;
-			if(Macros.NO_OF_JOBS == 7)
-				file  = new FileInputStream(new File("Jobs.xlsx"));
-			else
+			if(Macros.NO_OF_JOBS == 3)
 				file  = new FileInputStream(new File("Jobs_3.xlsx"));
+			else
+				file  = new FileInputStream(new File("Jobs.xlsx"));
 			XSSFWorkbook workbook = new XSSFWorkbook(file);
 			XSSFSheet sheet = workbook.getSheetAt(0);
 			
